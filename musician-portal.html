@@ -509,8 +509,7 @@ async function flipCamera(){
   if (!S.camList.length) await loadCameras();
   if (S.camList.length < 2) { chatLog('', 'Only one camera found', true); return; }
 
-  // Toggle between index 0 (front) and index 1 (rear only)
-  // Skip index 2 — it's a duplicate rear camera that fails
+  // Toggle between index 0 (front) and index 1 (first rear)
   S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
 
@@ -522,9 +521,11 @@ async function flipCamera(){
     });
     const newTrack = newStream.getVideoTracks()[0];
     const label    = nextCam.label.toLowerCase();
-    const isFront  = label.includes('front') || label.includes('user') || label.includes('selfie');
+    const isFront  = label.includes('front') || label.includes('forward') || label.includes('user') || label.includes('selfie');
     // no mirror
-    $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
+    const newSrc = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
+    $('local-video').srcObject = newSrc;
+    $('local-video').play().catch(()=>{});
     $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
     S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
     S.localStream.addTrack(newTrack);
