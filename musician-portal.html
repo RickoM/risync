@@ -746,34 +746,33 @@ function toggleCam(){
 }
 
 async function flipCamera(){
-  try {
-    const newFacing = S.facingMode === 'user' ? 'environment' : 'user';
+  const newFacing = S.facingMode === 'user' ? 'environment' : 'user';
+  const vid = $('local-video');
 
-    // Get new stream first — don't stop old one yet
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: newFacing },
-      audio: false,
-    });
-
+  // Get new camera stream — keep old one running until new is ready
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing }, audio: false })
+  .then(newStream => {
     const newTrack = newStream.getVideoTracks()[0];
+    if (!newTrack) return;
 
-    // Update local preview only — never touch peer connections
-    $('local-video').srcObject = new MediaStream(
-      [newTrack, ...S.localStream.getAudioTracks()]
-    );
+    // Build new stream keeping existing audio
+    const combined = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
+    
+    // Swap video element source
+    vid.srcObject = combined;
+    vid.play();
 
-    // Now stop old video tracks
-    S.localStream.getVideoTracks().forEach(t => t.stop());
-    S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
-    S.localStream.addTrack(newTrack);
-
-    // Update state
-    S.facingMode = newFacing;
-    $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear' : '🤳 Front';
-
-  } catch(e) {
-    console.error('[Flip] Error:', e.message);
-  }
+    // Stop old video tracks only after new is playing
+    vid.onplaying = () => {
+      S.localStream.getVideoTracks().forEach(t => t.stop());
+      S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
+      S.localStream.addTrack(newTrack);
+      S.facingMode = newFacing;
+      $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear' : '🤳 Front';
+      vid.onplaying = null;
+    };
+  })
+  .catch(e => console.error('[Flip]', e.message));
 }
 
 // ── CHAT ──────────────────────────────────────────────────────
