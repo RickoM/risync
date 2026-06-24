@@ -157,37 +157,18 @@ $('join-btn').addEventListener('click', () => {
   show('screen-perms');
 });
 
-// ALLOW CAMERA + MIC
+// ALLOW CAMERA + MIC — single getUserMedia call like original
 $('allow-btn').addEventListener('click', async () => {
   const btn = $('allow-btn');
   btn.disabled = true;
   btn.textContent = 'Starting...';
 
   try {
-    $('perm-status').textContent = 'Getting camera...';
-    const videoStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode },
-      audio: false
+    // Single call — video + audio together (same as original working version)
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode, width:{ideal:1280}, height:{ideal:720} },
+      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
-
-    let audioStream = null;
-    try {
-      $('perm-status').textContent = 'Getting microphone...';
-      audioStream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl:  true,
-        }
-      });
-    } catch(e) {
-      $('perm-status').textContent = 'Mic unavailable — video only';
-    }
-
-    const tracks = [...videoStream.getTracks()];
-    if (audioStream) audioStream.getAudioTracks().forEach(t => tracks.push(t));
-    localStream = new MediaStream(tracks);
 
     const hasAudio = localStream.getAudioTracks().length > 0;
     const hasVideo = localStream.getVideoTracks().length > 0;
@@ -200,17 +181,24 @@ $('allow-btn').addEventListener('click', async () => {
     $('mic-label').textContent = hasAudio ? 'Mic on' : 'No mic';
 
     show('screen-live');
-    if (hasAudio) {
-      startVU();
-      // Note: phone local video stays muted to prevent echo
-      // Mic monitoring is via the VU meter only
-    }
+    if (hasAudio) startVU();
     connectWS();
 
   } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Allow & continue →';
-    $('perm-status').textContent = 'Error: ' + e.message;
+    // If combined fails, try video only
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false });
+      $('live-video').srcObject = localStream;
+      $('cam-dot').className = 'dot green';
+      $('mic-dot').className = 'dot red';
+      $('mic-label').textContent = 'No mic';
+      show('screen-live');
+      connectWS();
+    } catch(e2) {
+      btn.disabled = false;
+      btn.textContent = 'Allow & continue →';
+      $('perm-status').textContent = 'Error: ' + e2.message;
+    }
   }
 });
 
