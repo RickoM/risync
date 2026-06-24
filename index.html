@@ -1854,9 +1854,13 @@ const REC = {
       case 'peer-joined':
         console.log('[RISYNC] Phone joined:', msg.peerId, msg.name);
         toast(`${msg.name || 'Phone'} connected — establishing video...`);
+        // Close QR modal now phone has joined
+        $('qr-modal').classList.remove('open');
         this.addPhoneCamera(msg.peerId, msg.name || 'Phone');
-        // Studio initiates the WebRTC offer to the phone
-        await this.createPhonePeerConn(msg.peerId, true);
+        // Small delay then initiate WebRTC offer
+        setTimeout(async () => {
+          await this.createPhonePeerConn(msg.peerId, true);
+        }, 500);
         break;
 
       case 'peer-left':
@@ -1897,7 +1901,7 @@ const REC = {
 
     pc.onicecandidate = e => {
       if (e.candidate) {
-        this.sigSend({ type:'ice-candidate', candidate: e.candidate, fromPeerId: this.studioPeerId });
+        this.sigSend({ type:'ice-candidate', candidate: e.candidate, fromPeerId: this.studioPeerId, targetPeerId: peerId });
       }
     };
 
@@ -1926,7 +1930,7 @@ const REC = {
     if (initiate) {
       const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
-      this.sigSend({ type:'offer', sdp: offer.sdp, fromPeerId: this.studioPeerId });
+      this.sigSend({ type:'offer', sdp: offer.sdp, fromPeerId: this.studioPeerId, targetPeerId: peerId });
     }
     return pc;
   },
