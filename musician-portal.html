@@ -241,9 +241,11 @@ input:focus,select:focus{border-color:var(--amber)}
     </div>
     <div style="margin:20px 0;padding:14px;background:var(--panel);border-radius:8px;font-family:var(--fm);font-size:.72rem;color:var(--subtle);line-height:1.8">
       Your video and audio stream directly to the host.<br>
-      Nothing is stored on any server.
+      Nothing is stored on any server.<br><br>
+      <strong style="color:var(--bright)">iPhone:</strong> Safari works best. If blocked: Settings → Safari → Camera → Allow.<br>
+      <strong style="color:var(--bright)">Android:</strong> Chrome works best. Tap Allow when prompted.
     </div>
-    <button class="btn btn-primary" id="allow-btn">Allow &amp; continue →</button>
+    <button class="btn btn-primary" id="allow-btn">Allow camera &amp; continue →</button>
   </div>
 </div>
 
@@ -300,10 +302,10 @@ input:focus,select:focus{border-color:var(--amber)}
 // ── CONFIG ──────────────────────────────────────────────────
 const params      = new URLSearchParams(window.location.search);
 const urlRoom     = params.get('room') || '';
-const urlWS       = params.get('ws')   || '';
-// Use ws from URL param (set by local server), fallback to same host
-const BACKEND_WS  = urlWS || (window.RISYNC_WS) || `ws://${window.location.hostname}:3011`;
-const BACKEND_API = window.RISYNC_API || `http://${window.location.hostname}:3010`;
+const urlWS       = ''; // always use Render
+
+const BACKEND_WS  = 'wss://risync-backend.onrender.com';
+const BACKEND_API = 'https://risync-backend.onrender.com';
 
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -364,10 +366,17 @@ $('join-btn').addEventListener('click', () => {
 });
 
 $('allow-btn').addEventListener('click', async () => {
+  // Check browser support first
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    show('screen-join');
+    showError('Camera not supported on this browser. Use Chrome or Safari.');
+    return;
+  }
   try {
+    // Try video + audio first
     S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} },
-      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+      video: { facingMode: S.facingMode },
+      audio: true,
     });
     $('local-video').srcObject = S.localStream;
     $('cam-label-overlay').textContent = S.label || S.name;
@@ -375,8 +384,17 @@ $('allow-btn').addEventListener('click', async () => {
     show('screen-live');
     connectWS();
   } catch(e){
-    show('screen-join');
-    showError('Camera/mic permission denied: ' + e.message);
+    // If video+audio fails, try video only
+    try {
+      S.localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: S.facingMode } });
+      $('local-video').srcObject = S.localStream;
+      show('screen-live');
+      connectWS();
+      chatLog('', 'Mic permission denied — video only', true);
+    } catch(e2){
+      show('screen-join');
+      showError('Camera access denied. On your phone: Settings → Browser → Camera → Allow. Then try again.');
+    }
   }
 });
 
