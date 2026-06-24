@@ -2,930 +2,399 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>RISYNC — Join Session v3</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>RISYNC — Join Session</title>
 <style>
-:root {
-  --ink:#080B12; --surface:#0F1220; --panel:#171B2A;
-  --border:#252B42; --muted:#363D5C; --subtle:#5A6490;
-  --body:#8D99C0; --bright:#E2E8F8;
-  --amber:#F0A030; --teal:#28B8A0; --red:#E04858; --green:#40C878;
-  --fd:'Syne',sans-serif; --fb:'Inter',sans-serif; --fm:'JetBrains Mono',monospace;
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: sans-serif;
+  background: #080B12;
+  color: #8D99C0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 40px;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:var(--fb);background:var(--ink);color:var(--body);
-  min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;padding:20px 16px 40px;
-}
-.logo{
-  font-family:var(--fd);font-weight:800;font-size:1.2rem;
-  color:var(--bright);letter-spacing:.1em;margin-bottom:24px;
-  align-self:flex-start;
-}
-.logo span{color:var(--amber)}
-
-/* ── SCREENS ── */
-.screen{width:100%;max-width:420px;display:none}
-.screen.active{display:block}
-
-/* ── JOIN SCREEN ── */
-.join-card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:16px;padding:28px 24px;
-}
-.join-title{
-  font-family:var(--fd);font-weight:800;font-size:1.4rem;
-  color:var(--bright);margin-bottom:6px;
-}
-.join-sub{font-size:.83rem;color:var(--subtle);margin-bottom:24px;line-height:1.6}
-.field{margin-bottom:16px}
-.field label{
-  font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--subtle);display:block;margin-bottom:7px;
-}
-input,select{
-  width:100%;background:var(--panel);border:1px solid var(--border);
-  border-radius:8px;color:var(--bright);font-family:var(--fb);
-  font-size:.88rem;padding:11px 14px;outline:none;
-  transition:border-color .2s;
-}
-input:focus,select:focus{border-color:var(--amber)}
-.btn{
-  width:100%;padding:13px;border:none;border-radius:8px;cursor:pointer;
-  font-family:var(--fd);font-weight:700;font-size:.9rem;letter-spacing:.04em;
-  transition:opacity .15s,transform .15s;
-}
-.btn:hover{opacity:.88;transform:translateY(-1px)}
-.btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
-.btn-primary{background:var(--amber);color:var(--ink)}
-.btn-secondary{
-  background:transparent;color:var(--body);
-  border:1px solid var(--border);margin-top:10px;
-}
-.session-info{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:10px;padding:14px 16px;margin-bottom:20px;
-}
-.session-name{
-  font-family:var(--fd);font-weight:700;font-size:1rem;
-  color:var(--bright);margin-bottom:4px;
-}
-.session-host{font-family:var(--fm);font-size:.7rem;color:var(--subtle)}
-.participants-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
-.participant-item{
-  display:flex;align-items:center;gap:8px;
-  font-size:.78rem;color:var(--body);
-}
-.participant-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
-
-/* ── LIVE SCREEN ── */
-.video-box{
-  width:100%;aspect-ratio:4/3;border-radius:12px;
-  background:var(--panel);border:1px solid var(--border);
-  overflow:hidden;position:relative;margin-bottom:14px;
-}
-.video-box video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-.cam-label{
-  position:absolute;bottom:10px;left:10px;
-  font-family:var(--fm);font-size:.65rem;letter-spacing:.08em;
-  background:rgba(8,11,18,.75);color:var(--bright);
-  padding:4px 10px;border-radius:20px;
-}
-.flip-btn{
-  position:absolute;top:10px;right:10px;
-  background:rgba(8,11,18,.75);border:1px solid var(--border);
-  color:var(--bright);border-radius:8px;padding:6px 10px;
-  font-size:.75rem;cursor:pointer;
-}
-
-/* ── LEVEL METER ── */
-.meter-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.meter-label{font-family:var(--fm);font-size:.65rem;color:var(--subtle);width:36px}
-.meter-track{flex:1;height:8px;background:var(--panel);border-radius:4px;overflow:hidden}
-.meter-fill{
-  height:100%;border-radius:4px;width:0%;
-  background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);
-  transition:width .05s linear;
-}
-.meter-db{font-family:var(--fm);font-size:.65rem;color:var(--subtle);width:36px;text-align:right}
-
-/* ── STATUS PILLS ── */
-.status-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.pill{
-  display:flex;align-items:center;gap:5px;
-  font-family:var(--fm);font-size:.65rem;letter-spacing:.06em;
-  padding:4px 10px;border-radius:20px;
-  background:var(--panel);border:1px solid var(--border);color:var(--subtle);
-}
-.pill-dot{width:6px;height:6px;border-radius:50%}
-.pill-dot.green{background:var(--green)}
-.pill-dot.amber{background:var(--amber);animation:blink 1s infinite}
-.pill-dot.red{background:var(--red)}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* ── CONTROLS ── */
-.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.ctrl-btn{
-  padding:12px;border:1px solid var(--border);border-radius:8px;
-  background:var(--panel);color:var(--body);
-  font-family:var(--fd);font-weight:700;font-size:.78rem;
-  cursor:pointer;text-align:center;transition:all .2s;
-}
-.ctrl-btn:hover{border-color:var(--muted);color:var(--bright)}
-.ctrl-btn.active-mute{background:rgba(224,72,88,.15);border-color:var(--red);color:var(--red)}
-.ctrl-btn.active-cam{background:rgba(240,160,48,.15);border-color:var(--amber);color:var(--amber)}
-
-/* ── CHAT ── */
-.chat-box{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;padding:12px 14px;
-  max-height:160px;overflow-y:auto;
-  font-family:var(--fm);font-size:.7rem;line-height:1.9;
-  color:var(--body);margin-bottom:10px;
-}
-.chat-input-row{display:flex;gap:8px}
-.chat-input-row input{flex:1;padding:9px 12px}
-.chat-send{
-  padding:9px 16px;background:var(--amber);color:var(--ink);
-  border:none;border-radius:8px;cursor:pointer;
-  font-family:var(--fd);font-weight:700;font-size:.78rem;
-}
-
-/* ── PARTICIPANTS SIDEBAR ── */
-.live-participants{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:10px;padding:14px;margin-bottom:14px;
-}
-.lp-title{
-  font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--subtle);margin-bottom:10px;
-}
-.lp-item{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 0;border-bottom:1px solid var(--border);font-size:.8rem;
-}
-.lp-item:last-child{border-bottom:none}
-.lp-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
-.lp-name{color:var(--bright);font-weight:500;flex:1}
-.lp-role{font-family:var(--fm);font-size:.62rem;color:var(--subtle)}
-
-/* ── ERROR ── */
-.error-box{
-  background:rgba(224,72,88,.1);border:1px solid var(--red);
-  border-radius:8px;padding:12px 14px;
-  font-size:.8rem;color:var(--red);margin-bottom:14px;
-  display:none;
-}
-.error-box.show{display:block}
+.logo { font-size: 1.2rem; font-weight: 800; color: #E2E8F8; letter-spacing: .1em; margin-bottom: 24px; align-self: flex-start; }
+.logo span { color: #F0A030; }
+.screen { width: 100%; max-width: 420px; display: none; }
+.screen.active { display: block; }
+.card { background: #0F1220; border: 1px solid #252B42; border-radius: 14px; padding: 24px; }
+h2 { color: #E2E8F8; font-size: 1.3rem; margin-bottom: 8px; }
+p { font-size: .85rem; line-height: 1.6; margin-bottom: 16px; }
+label { display: block; font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; color: #5A6490; margin-bottom: 6px; margin-top: 12px; }
+input, select { width: 100%; background: #171B2A; border: 1px solid #252B42; border-radius: 8px; color: #E2E8F8; font-size: .9rem; padding: 11px 14px; outline: none; }
+input:focus, select:focus { border-color: #F0A030; }
+.btn { display: block; width: 100%; padding: 13px; border: none; border-radius: 8px; font-size: .9rem; font-weight: 700; cursor: pointer; margin-top: 12px; }
+.btn-primary { background: #F0A030; color: #080B12; }
+.btn-secondary { background: transparent; color: #8D99C0; border: 1px solid #252B42; }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.error { background: rgba(224,72,88,.1); border: 1px solid #E04858; border-radius: 8px; padding: 10px 14px; font-size: .8rem; color: #E04858; margin-bottom: 12px; display: none; }
+.error.show { display: block; }
+.video-box { position: relative; width: 100%; aspect-ratio: 4/3; border-radius: 12px; background: #171B2A; border: 1px solid #252B42; overflow: hidden; margin-bottom: 12px; }
+.video-box video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.cam-label { position: absolute; bottom: 8px; left: 10px; background: rgba(8,11,18,.8); color: #E2E8F8; font-size: .65rem; padding: 3px 10px; border-radius: 12px; }
+.flip-btn { position: absolute; top: 8px; right: 8px; background: rgba(8,11,18,.75); border: 1px solid #252B42; color: #E2E8F8; border-radius: 8px; padding: 6px 12px; font-size: .8rem; cursor: pointer; }
+.meter-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.meter-label { font-size: .65rem; color: #5A6490; width: 30px; }
+.meter-track { flex: 1; height: 8px; background: #171B2A; border-radius: 4px; overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 4px; width: 0%; background: linear-gradient(90deg, #28B8A0 0%, #F0A030 70%, #E04858 92%); transition: width .05s linear; }
+.meter-db { font-size: .65rem; color: #5A6490; width: 40px; text-align: right; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.pill { display: flex; align-items: center; gap: 5px; font-size: .65rem; padding: 4px 10px; border-radius: 20px; background: #171B2A; border: 1px solid #252B42; color: #5A6490; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #363D5C; }
+.dot.green { background: #40C878; }
+.dot.amber { background: #F0A030; animation: blink 1s infinite; }
+.dot.red   { background: #E04858; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.ctrl { padding: 12px; background: #171B2A; border: 1px solid #252B42; border-radius: 8px; color: #8D99C0; font-size: .8rem; font-weight: 700; cursor: pointer; text-align: center; }
+.ctrl.muted { border-color: #E04858; color: #E04858; }
+.chat-box { background: #0F1220; border: 1px solid #252B42; border-radius: 8px; padding: 10px 12px; font-size: .72rem; line-height: 1.9; max-height: 120px; overflow-y: auto; margin-bottom: 8px; }
+.chat-row { display: flex; gap: 8px; }
+.chat-row input { flex: 1; padding: 8px 12px; font-size: .8rem; }
+.chat-send { padding: 8px 16px; background: #F0A030; color: #080B12; border: none; border-radius: 8px; font-weight: 700; font-size: .8rem; cursor: pointer; }
 </style>
 </head>
 <body>
 
 <div class="logo">RIS<span>Y</span>NC</div>
 
-<!-- ── SCREEN 1: JOIN ─────────────────────────────────── -->
+<!-- JOIN -->
 <div class="screen active" id="screen-join">
-  <div class="join-card">
-    <div class="join-title">Join Session</div>
-    <div class="join-sub">Enter the room code from the host's studio, or open the link they shared with you.</div>
-
-    <div class="error-box" id="join-error"></div>
-
-    <div class="field">
-      <label>Room code</label>
-      <input type="text" id="room-code" placeholder="e.g. A3F7B2C1" maxlength="8"
-             style="font-family:var(--fm);font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase">
-    </div>
-    <div class="field">
-      <label>Your name</label>
-      <input type="text" id="join-name" placeholder="e.g. Tony — Bass Guitar">
-    </div>
-    <div class="field">
-      <label>Your role</label>
-      <select id="join-role">
-        <option value="musician">Musician</option>
-        <option value="vocalist">Vocalist</option>
-        <option value="producer">Producer / Director</option>
-        <option value="camera">Camera only</option>
-        <option value="viewer">Viewer / Listener</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Camera label</label>
-      <input type="text" id="join-label" placeholder="e.g. Bass close-up, Wide shot">
-    </div>
-
-    <button class="btn btn-primary" id="join-btn">Join session →</button>
-
+  <div class="card">
+    <h2>Join Session</h2>
+    <p>Enter the room code from the studio screen.</p>
+    <div class="error" id="error-box"></div>
+    <label>Room code</label>
+    <input type="text" id="room-code" placeholder="e.g. RS4X7B" maxlength="8"
+      style="font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase">
+    <label>Your name</label>
+    <input type="text" id="join-name" placeholder="e.g. Richard">
+    <button class="btn btn-primary" id="join-btn">Join →</button>
   </div>
 </div>
 
-<!-- ── SCREEN 2: PERMISSIONS ─────────────────────────── -->
+<!-- PERMISSIONS -->
 <div class="screen" id="screen-perms">
-  <div class="join-card" style="text-align:center">
+  <div class="card" style="text-align:center">
     <div style="font-size:2.5rem;margin-bottom:14px">📷🎤</div>
-    <div class="join-title" style="text-align:center;margin-bottom:8px">Allow camera &amp; mic</div>
-    <div class="join-sub" style="text-align:center">
-      Your browser will ask for permission to use your camera and microphone.
-      Click <strong style="color:var(--bright)">Allow</strong> when prompted.
-    </div>
-    <div style="margin:20px 0;padding:14px;background:var(--panel);border-radius:8px;font-family:var(--fm);font-size:.72rem;color:var(--subtle);line-height:1.8">
-      Your video and audio stream directly to the host.<br>
-      Nothing is stored on any server.<br><br>
-      <strong style="color:var(--bright)">iPhone:</strong> Safari works best. If blocked: Settings → Safari → Camera → Allow.<br>
-      <strong style="color:var(--bright)">Android:</strong> Chrome works best. Tap Allow when prompted.
-    </div>
-    <button class="btn btn-primary" id="allow-btn">Allow camera &amp; continue →</button>
-    <div id="cam-debug" style="margin-top:12px;font-family:var(--fm);font-size:.62rem;color:var(--subtle);word-break:break-all;display:none"></div>
-    <button onclick="checkCamSupport()" class="btn btn-secondary" style="margin-top:10px;font-size:.65rem;padding:6px 14px">🔍 Check camera support</button>
+    <h2>Allow camera &amp; mic</h2>
+    <p>Tap Allow when your browser asks.</p>
+    <div id="perm-status" style="font-size:.78rem;color:#5A6490;margin-bottom:16px;min-height:20px"></div>
+    <button class="btn btn-primary" id="allow-btn">Allow &amp; continue →</button>
   </div>
 </div>
 
-<script>
-function checkCamSupport() {
-  const d = document.getElementById('cam-debug');
-  d.style.display = 'block';
-  const lines = [];
-  lines.push('mediaDevices: ' + (!!navigator.mediaDevices));
-  lines.push('getUserMedia: ' + (!!navigator.mediaDevices?.getUserMedia));
-  lines.push('protocol: ' + location.protocol);
-  lines.push('host: ' + location.hostname);
-  lines.push('isSecure: ' + (location.protocol === 'https:'));
-  if (navigator.mediaDevices) {
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-      const cams = devices.filter(d => d.kind === 'videoinput');
-      const mics = devices.filter(d => d.kind === 'audioinput');
-      lines.push('cameras found: ' + cams.length);
-      lines.push('mics found: ' + mics.length);
-      cams.forEach((c,i) => lines.push('cam'+i+': ' + (c.label||'(no label)')));
-      d.innerHTML = lines.join('<br>');
-    }).catch(e => {
-      lines.push('enumerate error: ' + e.message);
-      d.innerHTML = lines.join('<br>');
-    });
-  } else {
-    d.innerHTML = lines.join('<br>');
-  }
-}
-</script>
-
-<!-- ── SCREEN 3: LIVE ─────────────────────────────────── -->
+<!-- LIVE -->
 <div class="screen" id="screen-live">
-
-  <!-- Status -->
-  <div class="status-row" id="status-row">
-    <div class="pill"><div class="pill-dot amber" id="conn-dot"></div><span id="conn-label">Connecting...</span></div>
-    <div class="pill"><div class="pill-dot" id="cam-dot" style="background:var(--subtle)"></div><span id="cam-label">Camera</span></div>
-    <div class="pill"><div class="pill-dot" id="mic-dot" style="background:var(--subtle)"></div><span id="mic-label">Mic</span></div>
+  <div class="pills">
+    <div class="pill"><div class="dot amber" id="conn-dot"></div><span id="conn-label">Connecting...</span></div>
+    <div class="pill"><div class="dot" id="mic-dot"></div><span id="mic-label">Mic</span></div>
+    <div class="pill"><div class="dot" id="cam-dot"></div><span id="cam-label">Camera</span></div>
   </div>
 
-  <!-- Video preview -->
   <div class="video-box">
-    <video id="local-video" autoplay muted playsinline></video>
-    <div class="cam-label" id="cam-label-overlay">Your camera</div>
+    <video id="live-video" autoplay muted playsinline></video>
+    <div class="cam-label" id="cam-name">Camera</div>
     <button class="flip-btn" id="flip-btn">⟳ Flip</button>
   </div>
 
-  <!-- Camera controls -->
-  <div id="cam-controls" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
-    
-    <!-- Zoom -->
-    <div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Zoom</span>
-        <span style="font-family:var(--fm);font-size:.68rem;color:var(--amber)" id="zoom-val">1×</span>
-      </div>
-      <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1"
-        style="width:100%;accent-color:var(--amber)"
-        oninput="CAM.setZoom(this.value)">
-      <div style="display:flex;justify-content:space-between;margin-top:3px">
-        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">1×</span>
-        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)" id="zoom-max">5×</span>
-      </div>
-    </div>
-
-    <!-- Focus -->
-    <div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Focus</span>
-        <div style="display:flex;gap:6px">
-          <button onclick="CAM.setFocus('auto')" id="focus-auto-btn"
-            style="font-family:var(--fm);font-size:.62rem;padding:3px 10px;border-radius:5px;border:1px solid var(--amber);background:var(--amber-glow);color:var(--amber);cursor:pointer">
-            Auto
-          </button>
-          <button onclick="CAM.setFocus('manual')" id="focus-manual-btn"
-            style="font-family:var(--fm);font-size:.62rem;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--subtle);cursor:pointer">
-            Manual
-          </button>
-        </div>
-      </div>
-      <input type="range" id="focus-slider" min="0" max="1" step="0.01" value="0.5"
-        style="width:100%;accent-color:var(--teal);display:none"
-        oninput="CAM.setFocusDistance(this.value)">
-    </div>
-
-    <!-- Exposure -->
-    <div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Exposure</span>
-        <span style="font-family:var(--fm);font-size:.68rem;color:var(--subtle)" id="exp-val">Auto</span>
-      </div>
-      <input type="range" id="exp-slider" min="-3" max="3" step="0.5" value="0"
-        style="width:100%;accent-color:var(--violet)"
-        oninput="CAM.setExposure(this.value)">
-      <div style="display:flex;justify-content:space-between;margin-top:3px">
-        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">Dark</span>
-        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">Bright</span>
-      </div>
-    </div>
-
-    <!-- White balance -->
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">White Balance</span>
-        <span style="font-family:var(--fm);font-size:.68rem;color:var(--subtle)" id="wb-val">Auto</span>
-      </div>
-      <select id="wb-select" onchange="CAM.setWhiteBalance(this.value)"
-        style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--bright);font-size:.75rem;padding:6px 10px;outline:none">
-        <option value="auto">Auto</option>
-        <option value="daylight">Daylight</option>
-        <option value="cloudy">Cloudy</option>
-        <option value="fluorescent">Fluorescent</option>
-        <option value="incandescent">Incandescent</option>
-      </select>
-    </div>
-  </div>
-
-  <!-- Toggle camera controls -->
-  <button id="toggle-cam-controls" onclick="CAM.toggleControls()"
-    style="width:100%;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--subtle);font-family:var(--fm);font-size:.65rem;cursor:pointer;margin-bottom:12px;display:none">
-    🎛 Camera controls
-  </button>
-
-  <!-- Levels -->
   <div class="meter-row">
-    <div class="meter-label" style="font-size:.6rem">MIC</div>
-    <div class="meter-track"><div class="meter-fill" id="mic-meter"></div></div>
-    <div class="meter-db" id="mic-db">— dB</div>
+    <div class="meter-label">MIC</div>
+    <div class="meter-track"><div class="meter-fill" id="mic-fill"></div></div>
+    <div class="meter-db" id="mic-db">—</div>
   </div>
 
-  <!-- Participants -->
-  <div class="live-participants">
-    <div class="lp-title">In this session</div>
-    <div id="live-participants-list">
-      <div class="lp-item"><div class="lp-dot"></div><div class="lp-name" id="host-name-live">Host</div><div class="lp-role">host</div></div>
-    </div>
-  </div>
-
-  <!-- Controls -->
   <div class="controls">
-    <button class="ctrl-btn" id="mute-btn">🎤 Mic on</button>
-    <button class="ctrl-btn" id="cam-btn">📷 Cam on</button>
+    <button class="ctrl" id="mute-btn">🎤 Mic on</button>
+    <button class="ctrl" id="cam-btn">📷 Cam on</button>
+  </div>
+  <div style="font-size:.7rem;color:#5A6490;margin-bottom:10px;padding:8px 10px;background:#171B2A;border-radius:8px;border:1px solid #252B42">
+    🎧 <strong style="color:#8D99C0">Headphones recommended</strong> — prevents echo when monitoring mic
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#171B2A;border-radius:8px;border:1px solid #252B42">
+    <span style="font-size:.8rem">Monitor mic (hear yourself)</span>
+    <button class="ctrl" id="monitor-btn" style="width:auto;padding:6px 14px;font-size:.75rem">Off</button>
   </div>
 
-  <!-- Chat -->
-  <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:7px">Session chat</div>
+  <audio id="monitor-audio" autoplay></audio>
   <div class="chat-box" id="chat-box"></div>
-  <div class="chat-input-row">
-    <input type="text" id="chat-input" placeholder="Send a message..." maxlength="200">
+  <div class="chat-row">
+    <input type="text" id="chat-input" placeholder="Message...">
     <button class="chat-send" id="chat-send">Send</button>
   </div>
-
-  <button class="btn btn-secondary" id="leave-btn" style="margin-top:16px">Leave session</button>
+  <button class="btn btn-secondary" id="leave-btn" style="margin-top:12px">Leave</button>
 </div>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────────
-const params      = new URLSearchParams(window.location.search);
-const urlRoom     = params.get('room') || '';
-const urlWS       = ''; // always use Render
-
-// Force wss:// — never allow ws:// from HTTPS page
-const BACKEND_WS  = 'wss://risync-backend.onrender.com';
-
-// Safety check — if somehow ws:// sneaks in, upgrade it
-function safeWsUrl(url) {
-  return url.replace(/^ws:\/\//i, 'wss://');
-}
-const BACKEND_API = 'https://risync-backend.onrender.com';
-
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  // Free TURN server — needed on institutional/campus networks
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-];
-
-// ── STATE ────────────────────────────────────────────────────
-const S = {
-  ws: null, peerId: null, roomId: null,
-  localStream: null, facingMode: 'user',
-  peers: new Map(), // peerId → RTCPeerConnection
-  micMuted: false, camOff: false,
-  audioCtx: null, analyser: null, vuFrame: null,
-  name: '', role: '', label: '',
+const params  = new URLSearchParams(window.location.search);
+const urlRoom = params.get('room') || '';
+const WS_URL  = 'wss://risync-backend.onrender.com';
+const ICE_CFG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80',  username:'openrelayproject', credential:'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject' },
+  ]
 };
 
-// ── UTILS ────────────────────────────────────────────────────
+let ws = null, peerId = null, roomId = null, myName = '';
+let localStream = null, facingMode = 'user';
+let micMuted = false, camOff = false;
+let peers = new Map();
+let audioCtx = null, analyser = null, vuFrame = null;
+
 const $ = id => document.getElementById(id);
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
-function showError(msg){ const e=$('join-error'); e.textContent=msg; e.classList.add('show'); }
-function clearError(){ $('join-error').classList.remove('show'); }
-function chatLog(name, text, isSystem=false){
-  const b=$('chat-box');
-  b.innerHTML += `<div style="color:${isSystem?'var(--subtle)':'var(--body)'}"><span style="color:var(--amber)">${isSystem?'':name+': '}</span>${text}</div>`;
-  b.scrollTop=b.scrollHeight;
-}
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); $(id).classList.add('active'); }
+function setErr(msg) { const e = $('error-box'); e.textContent = msg; e.classList.add('show'); }
+function log(text, sys) { const b = $('chat-box'); b.innerHTML += `<div style="color:${sys?'#5A6490':'#8D99C0'}">${text}</div>`; b.scrollTop = b.scrollHeight; }
 
-// ── ROOM PREVIEW ─────────────────────────────────────────────
-$('room-code').addEventListener('input', e => {
-  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-});
+// Auto-fill room code from URL
+if (urlRoom) $('room-code').value = urlRoom.toUpperCase();
 
-// preview-btn removed
-
-// ── JOIN FLOW ─────────────────────────────────────────────────
+// JOIN
 $('join-btn').addEventListener('click', () => {
-  S.roomId = $('room-code').value.trim().toUpperCase();
-  S.name   = $('join-name').value.trim() || 'Musician';
-  S.role   = $('join-role').value;
-  S.label  = $('join-label').value.trim() || S.name;
-  if(!S.roomId){ showError('Enter a room code'); return; }
+  roomId = $('room-code').value.trim().toUpperCase();
+  myName = $('join-name').value.trim() || 'Phone';
+  if (!roomId) { setErr('Enter a room code'); return; }
+  $('error-box').classList.remove('show');
   show('screen-perms');
 });
 
-$('allow-btn').addEventListener('click', () => {
+// ALLOW CAMERA + MIC
+$('allow-btn').addEventListener('click', async () => {
   const btn = $('allow-btn');
-  btn.textContent = 'Starting camera...';
   btn.disabled = true;
   btn.textContent = 'Starting...';
 
-  async function startCamera() {
-    // Get video and audio SEPARATELY
-    // This way if one fails the other still works
-
-    // Get video stream
-    let videoStream = null;
-    try {
-      videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
-        audio: false
-      });
-    } catch(e) {
-      // Try without constraints
-      videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    }
-
-    // Get mic stream separately
-    let audioStream = null;
-    let hasMic = false;
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
-      });
-      hasMic = true;
-      console.log('[Portal] Mic acquired separately');
-    } catch(e) {
-      console.log('[Portal] Mic not available:', e.message);
-    }
-
-    // Combine into single stream
-    const tracks = [...videoStream.getTracks()];
-    if (audioStream) tracks.push(...audioStream.getTracks());
-    const stream = new MediaStream(tracks);
-
-    console.log('[Portal] Combined stream — video:', stream.getVideoTracks().length, 'audio:', stream.getAudioTracks().length);
-    return { stream, hasMic };
-  }
-
-  startCamera()
-  .then(({ stream, hasMic }) => {
-    // Store stream globally
-    S.localStream = stream;
-    S.facingMode  = 'user';
-
-    console.log('[Portal] Stream ready. Video tracks:', stream.getVideoTracks().length, 'Audio tracks:', stream.getAudioTracks().length);
-
-    // Show video
-    const vid = $('local-video');
-    vid.srcObject = stream;
-    vid.play().catch(()=>{});
-
-    // Update mic status indicator
-    const micDot   = document.getElementById('mic-dot');
-    const micLabel = document.getElementById('mic-label');
-    if (hasMic && stream.getAudioTracks().length > 0) {
-      if(micDot)   micDot.style.background = 'var(--green)';
-      if(micLabel) micLabel.textContent    = 'Mic live';
-    } else {
-      if(micDot)   micDot.style.background = 'var(--red)';
-      if(micLabel) micLabel.textContent    = 'Mic off';
-    }
-
-    $('cam-label-overlay').textContent = '🤳 Front Camera';
-    show('screen-live');
-    connectWS();
-    CAM.init(stream);
-    if (stream.getAudioTracks().length > 0) setupVU();
-  })
-  .catch(err => {
-    btn.textContent = 'Allow camera & continue →';
-    btn.disabled    = false;
-    showError('Camera access failed: ' + err.message + '. Go to Chrome Settings → Site Settings → Camera → Allow rickom.github.io');
-  });
-});
-
-// ── WEBSOCKET ─────────────────────────────────────────────────
-function connectWS(){
-  S.ws = new WebSocket(safeWsUrl(BACKEND_WS));
-  S.ws.onopen = () => { $('conn-dot').style.background='var(--amber)'; $('conn-label').textContent='Connecting...'; };
-  S.ws.onmessage = e => handleMessage(JSON.parse(e.data));
-  S.ws.onclose = () => {
-    $('conn-dot').style.background='var(--red)'; $('conn-label').textContent='Disconnected';
-    chatLog('', 'Connection lost — trying to reconnect...', true);
-    setTimeout(connectWS, 3000);
-  };
-  S.ws.onerror = () => { $('conn-dot').style.background='var(--red)'; };
-}
-
-function send(msg){ if(S.ws?.readyState===1) S.ws.send(JSON.stringify(msg)); }
-
-async function handleMessage(msg){
-  switch(msg.type){
-
-    case 'connected':
-      S.peerId = msg.peerId;
-      send({ type:'join-room', roomId:S.roomId, roomCode:S.roomId, name:S.name, role:S.role, label:S.label });
-      break;
-
-    case 'room-joined':
-      $('conn-dot').style.background='var(--green)';
-      $('conn-label').textContent='Connected';
-      $('cam-dot').style.background='var(--green)'; $('cam-label').textContent='Cam live';
-      $('mic-dot').style.background='var(--green)'; $('mic-label').textContent='Mic live';
-      if(msg.room) {
-        if(msg.room.participants) renderParticipants(msg.room.participants);
-        if(msg.room.hostName) $('host-name-live').textContent = msg.room.hostName;
-        chatLog('', `You joined "${msg.room.sessionName||'Session'}"`, true);
-      } else {
-        chatLog('', 'Joined session — waiting for host video...', true);
-      }
-      // Phone waits for studio to send offer — do NOT initiate
-      break;
-
-    case 'peer-joined':
-      chatLog('', `${msg.name||'Host'} joined`, true);
-      addParticipantItem(msg);
-      // Phone does NOT initiate — waits for offer from studio
-      break;
-
-    case 'peer-left':
-      chatLog('', `A participant left`, true);
-      removeParticipantItem(msg.peerId);
-      if(S.peers.has(msg.peerId)){ S.peers.get(msg.peerId).close(); S.peers.delete(msg.peerId); }
-      break;
-
-    case 'offer':
-      await handleOffer(msg.fromPeerId, msg.sdp);
-      break;
-
-    case 'answer':
-      await S.peers.get(msg.fromPeerId)?.setRemoteDescription({ type:'answer', sdp:msg.sdp });
-      break;
-
-    case 'ice-candidate':
-      if(msg.candidate) await S.peers.get(msg.fromPeerId)?.addIceCandidate(msg.candidate);
-      break;
-
-    case 'chat':
-      chatLog(msg.fromName, msg.text);
-      break;
-
-    case 'muted-by-host':
-      if(msg.muted && !S.micMuted) toggleMic();
-      chatLog('', 'You were muted by the host', true);
-      break;
-
-    case 'error':
-      console.warn('[Portal] Server error:', msg.message);
-      // Only redirect to join if we're on live screen
-      if (document.getElementById('screen-live').classList.contains('active')) {
-        show('screen-join');
-      }
-      showError(msg.message);
-      break;
-  }
-}
-
-// ── WEBRTC ────────────────────────────────────────────────────
-function createPeerConnection(targetPeerId){
-  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-  S.peers.set(targetPeerId, pc);
-
-  // Add ALL local tracks so studio receives phone camera + mic
-  if(S.localStream){
-    S.localStream.getTracks().forEach(track => {
-      pc.addTrack(track, S.localStream);
-      console.log('[Phone] Added track:', track.kind, track.label);
-    });
-  } else {
-    console.warn('[Phone] No local stream yet when creating peer connection');
-  }
-
-  pc.onicecandidate = e => {
-    if(e.candidate){
-      console.log('[Phone] Sending ICE candidate');
-      send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
-    }
-  };
-
-  pc.oniceconnectionstatechange = () => {
-    console.log('[Phone] ICE state:', pc.iceConnectionState);
-    if(pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed'){
-      chatLog('', 'Video connected to studio!', true);
-      $('conn-dot').style.background='var(--green)';
-      $('conn-label').textContent='Streaming';
-    }
-  };
-
-  pc.onconnectionstatechange = () => {
-    console.log('[Phone] Connection state:', pc.connectionState);
-    if(pc.connectionState === 'connected') chatLog('', 'Live in studio!', true);
-    if(pc.connectionState === 'failed'){
-      console.log('[Phone] Connection failed — restarting ICE');
-      pc.restartIce();
-    }
-  };
-
-  return pc;
-}
-
-async function handleOffer(fromPeerId, sdp){
-  console.log('[Phone] Received offer from:', fromPeerId);
-  const pc = createPeerConnection(fromPeerId);
   try {
-    await pc.setRemoteDescription({ type:'offer', sdp });
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    console.log('[Phone] Sending answer');
-    send({ type:'answer', targetPeerId:fromPeerId, sdp:answer.sdp });
-  } catch(e) {
-    console.error('[Phone] handleOffer error:', e);
-    chatLog('', 'Video error: ' + e.message, true);
-  }
-}
-
-// ── PARTICIPANTS ──────────────────────────────────────────────
-function renderParticipants(list){
-  $('live-participants-list').innerHTML = list.map(p =>
-    `<div class="lp-item" id="lp-${p.peerId}">
-      <div class="lp-dot"></div>
-      <div class="lp-name">${p.name}${p.isHost?' 👑':''}</div>
-      <div class="lp-role">${p.role}</div>
-    </div>`
-  ).join('');
-}
-function addParticipantItem(p){
-  const list=$('live-participants-list');
-  const el=document.createElement('div');
-  el.className='lp-item'; el.id='lp-'+p.peerId;
-  el.innerHTML=`<div class="lp-dot"></div><div class="lp-name">${p.name}</div><div class="lp-role">${p.role}</div>`;
-  list.appendChild(el);
-}
-function removeParticipantItem(peerId){ $('lp-'+peerId)?.remove(); }
-
-// ── VU METER ──────────────────────────────────────────────────
-function setupVU(){
-  try {
-    S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-
-    // Resume context — required on mobile Chrome after user gesture
-    if (S.audioCtx.state === 'suspended') {
-      S.audioCtx.resume().then(() => {
-        console.log('[Portal] AudioContext resumed');
-      });
-    }
-
-    const audioTrack = S.localStream.getAudioTracks()[0];
-    if (!audioTrack) {
-      console.warn('[Portal] No audio track for VU meter');
-      return;
-    }
-
-    console.log('[Portal] Setting up VU meter for track:', audioTrack.label);
-    const micStream = new MediaStream([audioTrack]);
-    const src = S.audioCtx.createMediaStreamSource(micStream);
-    S.analyser = S.audioCtx.createAnalyser();
-    S.analyser.fftSize = 256;
-    src.connect(S.analyser);
-
-    const data = new Uint8Array(128);
-    function draw(){
-      S.vuFrame = requestAnimationFrame(draw);
-      if (!S.analyser) return;
-      S.analyser.getByteFrequencyData(data);
-      const avg = data.reduce((a,b)=>a+b,0)/data.length;
-      const pct = Math.min(100, avg/128*200);
-      const db  = pct > 0 ? Math.round(20*Math.log10(pct/100)) : '-∞';
-      const meter = $('mic-meter');
-      const dbEl  = $('mic-db');
-      if (meter) meter.style.width = pct+'%';
-      if (dbEl)  dbEl.textContent  = db+'dB';
-    }
-    draw();
-    console.log('[Portal] VU meter running');
-  } catch(e) {
-    console.error('[Portal] VU setup error:', e.message);
-  }
-}
-
-// ── CONTROLS ──────────────────────────────────────────────────
-$('mute-btn').addEventListener('click', toggleMic);
-$('cam-btn').addEventListener('click', toggleCam);
-$('flip-btn').addEventListener('click', () => {
-  console.log('[Flip] Button tapped, facingMode:', S.facingMode, 'stream:', !!S.localStream);
-  flipCamera();
-});
-
-function toggleMic(){
-  S.micMuted=!S.micMuted;
-  S.localStream.getAudioTracks().forEach(t=>t.enabled=!S.micMuted);
-  $('mute-btn').textContent = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
-  $('mute-btn').classList.toggle('active-mute', S.micMuted);
-  $('mic-dot').style.background = S.micMuted ? 'var(--red)' : 'var(--green)';
-}
-
-function toggleCam(){
-  S.camOff=!S.camOff;
-  S.localStream.getVideoTracks().forEach(t=>t.enabled=!S.camOff);
-  $('cam-btn').textContent = S.camOff ? '🚫 Cam off' : '📷 Cam on';
-  $('cam-btn').classList.toggle('active-cam', S.camOff);
-  $('cam-dot').style.background = S.camOff ? 'var(--red)' : 'var(--green)';
-}
-
-async function flipCamera(){
-  if (!S.localStream) { console.warn('[Flip] No stream'); return; }
-
-  const newFacing = S.facingMode === 'user' ? 'environment' : 'user';
-  console.log('[Flip] Switching from', S.facingMode, 'to', newFacing);
-
-  try {
-    // Get new video stream — keep old running
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: newFacing },
+    $('perm-status').textContent = 'Getting camera...';
+    const videoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode },
       audio: false
     });
 
-    const newTrack = newStream.getVideoTracks()[0];
-    if (!newTrack) { console.warn('[Flip] No track in new stream'); return; }
+    let audioStream = null;
+    try {
+      $('perm-status').textContent = 'Getting microphone...';
+      audioStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl:  true,
+        }
+      });
+    } catch(e) {
+      $('perm-status').textContent = 'Mic unavailable — video only';
+    }
 
-    console.log('[Flip] New track:', newTrack.label);
+    const tracks = [...videoStream.getTracks()];
+    if (audioStream) audioStream.getAudioTracks().forEach(t => tracks.push(t));
+    localStream = new MediaStream(tracks);
 
-    // Keep existing audio, swap video
-    const audioTracks = S.localStream.getAudioTracks();
-    const combined    = new MediaStream([newTrack, ...audioTracks]);
+    const hasAudio = localStream.getAudioTracks().length > 0;
+    const hasVideo = localStream.getVideoTracks().length > 0;
 
-    // Update video preview
-    const vid = $('local-video');
-    vid.srcObject = combined;
-    vid.play().catch(()=>{});
+    $('live-video').srcObject = localStream;
+    $('cam-name').textContent  = '🤳 Front';
+    $('cam-dot').className  = 'dot ' + (hasVideo ? 'green' : 'red');
+    $('mic-dot').className  = 'dot ' + (hasAudio ? 'green' : 'red');
+    $('cam-label').textContent = hasVideo ? 'Cam on' : 'No cam';
+    $('mic-label').textContent = hasAudio ? 'Mic on' : 'No mic';
 
-    // Stop old video AFTER new is set
-    S.localStream.getVideoTracks().forEach(t => t.stop());
-
-    // Rebuild localStream
-    const newLocalStream = new MediaStream([newTrack, ...audioTracks]);
-    S.localStream = newLocalStream;
-    S.facingMode  = newFacing;
-
-    $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear Cam' : '🤳 Front Cam';
-    console.log('[Flip] Done — now on', newFacing);
+    show('screen-live');
+    if (hasAudio) {
+      startVU();
+      // Note: phone local video stays muted to prevent echo
+      // Mic monitoring is via the VU meter only
+    }
+    connectWS();
 
   } catch(e) {
-    console.error('[Flip] Error:', e.message);
+    btn.disabled = false;
+    btn.textContent = 'Allow & continue →';
+    $('perm-status').textContent = 'Error: ' + e.message;
+  }
+});
+
+// VU METER
+function startVU() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const track  = localStream.getAudioTracks()[0];
+    const stream = new MediaStream([track]);
+    const src    = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    function draw() {
+      vuFrame = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b) => a+b, 0) / data.length;
+      const pct = Math.min(100, avg / 128 * 200);
+      $('mic-fill').style.width = pct + '%';
+      $('mic-db').textContent   = pct > 0 ? Math.round(20*Math.log10(pct/100)) + 'dB' : '—';
+    }
+    draw();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e) { console.warn('VU:', e.message); }
+}
+
+// WEBSOCKET
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen  = () => { $('conn-dot').className = 'dot amber'; };
+  ws.onclose = () => {
+    $('conn-dot').className = 'dot red';
+    $('conn-label').textContent = 'Reconnecting...';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = e => onMsg(JSON.parse(e.data));
+}
+
+function send(msg) { if (ws?.readyState === 1) ws.send(JSON.stringify(msg)); }
+
+async function onMsg(msg) {
+  switch(msg.type) {
+    case 'connected':
+      peerId = msg.peerId;
+      send({ type:'join-room', roomId, roomCode:roomId, name:myName, role:'musician' });
+      break;
+    case 'room-joined':
+      $('conn-dot').className = 'dot green';
+      $('conn-label').textContent = 'Connected';
+      log('Joined session', true);
+      break;
+    case 'peer-joined':
+      log(msg.name + ' joined', true);
+      break;
+    case 'peer-left':
+      log('Participant left', true);
+      peers.get(msg.peerId)?.close();
+      peers.delete(msg.peerId);
+      break;
+    case 'offer':
+      await handleOffer(msg.fromPeerId, msg.sdp);
+      break;
+    case 'answer':
+      await peers.get(msg.fromPeerId)?.setRemoteDescription({ type:'answer', sdp:msg.sdp });
+      break;
+    case 'ice-candidate':
+      if (msg.candidate) await peers.get(msg.fromPeerId)?.addIceCandidate(msg.candidate);
+      break;
+    case 'chat':
+      log((msg.fromName||'Host') + ': ' + msg.text);
+      break;
+    case 'error':
+      log('Error: ' + msg.message, true);
+      break;
   }
 }
 
-// ── CHAT ──────────────────────────────────────────────────────
-function sendChat(){
-  const text=$('chat-input').value.trim();
-  if(!text) return;
-  send({ type:'chat', text });
-  chatLog('You', text);
-  $('chat-input').value='';
+// WEBRTC
+function createPC(remotePeerId) {
+  const pc = new RTCPeerConnection(ICE_CFG);
+  peers.set(remotePeerId, pc);
+  if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  pc.onicecandidate = e => {
+    if (e.candidate) send({ type:'ice-candidate', candidate:e.candidate, targetPeerId:remotePeerId });
+  };
+  pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') {
+      log('Streaming to studio', true);
+      $('conn-label').textContent = 'Live';
+    }
+  };
+  return pc;
 }
-$('chat-send').addEventListener('click', sendChat);
-$('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
 
-// ── CAMERA CONTROLS (MediaStream Image Capture API) ──────────
-const CAM = {
-  videoTrack: null,
+async function handleOffer(fromPeerId, sdp) {
+  const pc = createPC(fromPeerId);
+  await pc.setRemoteDescription({ type:'offer', sdp });
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  send({ type:'answer', sdp:answer.sdp, targetPeerId:fromPeerId });
+}
 
-  async init(stream) {
-    this.videoTrack = stream.getVideoTracks()[0];
-    if (!this.videoTrack) return;
-
-    // Always show camera controls — hide individual sliders if not supported
-    document.getElementById('cam-controls').style.display = 'none'; // hidden until toggled
-    document.getElementById('toggle-cam-controls').style.display = 'block';
-
-    const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
-    console.log('[CAM] Capabilities:', JSON.stringify(caps));
-
-    // Zoom
-    if (caps.zoom) {
-      const s = document.getElementById('zoom-slider');
-      s.min   = caps.zoom.min  || 1;
-      s.max   = caps.zoom.max  || 10;
-      s.step  = caps.zoom.step || 0.1;
-      s.value = s.min;
-      document.getElementById('zoom-max').textContent = (caps.zoom.max || 10) + 'x';
-      document.getElementById('zoom-slider').closest('div').style.display = 'block';
-    } else {
-      // Hide zoom if not supported
-      document.getElementById('zoom-slider').closest('div').style.display = 'none';
-    }
-
-    // Exposure
-    if (caps.exposureCompensation) {
-      const e = document.getElementById('exp-slider');
-      e.min   = caps.exposureCompensation.min   || -3;
-      e.max   = caps.exposureCompensation.max   || 3;
-      e.step  = caps.exposureCompensation.step  || 0.5;
-    }
-
-    // Focus
-    if (!caps.focusMode) {
-      document.getElementById('focus-auto-btn').closest('div').closest('div').style.display = 'none';
-    }
-
-    // White balance
-    if (!caps.whiteBalanceMode) {
-      document.getElementById('wb-select').closest('div').style.display = 'none';
-    }
-  },
-
-  async apply(c) {
-    if (!this.videoTrack) return;
-    try { await this.videoTrack.applyConstraints({ advanced: [c] }); }
-    catch(e) { console.warn('[CAM]', e.message); }
-  },
-
-  async setZoom(v) {
-    document.getElementById('zoom-val').textContent = parseFloat(v).toFixed(1) + 'x';
-    await this.apply({ zoom: parseFloat(v) });
-  },
-
-  async setFocus(mode) {
-    const isAuto = mode === 'auto';
-    document.getElementById('focus-slider').style.display = isAuto ? 'none' : 'block';
-    await this.apply({ focusMode: isAuto ? 'continuous' : 'manual' });
-  },
-
-  async setFocusDistance(v) { await this.apply({ focusDistance: parseFloat(v) }); },
-
-  async setExposure(v) {
-    const n = parseFloat(v);
-    document.getElementById('exp-val').textContent = n===0 ? 'Auto' : (n>0?'+':'')+n+' EV';
-    await this.apply({ exposureCompensation: n });
-  },
-
-  async setWhiteBalance(mode) {
-    const temps = {daylight:5500,cloudy:6500,fluorescent:4000,incandescent:2700};
-    document.getElementById('wb-val').textContent = mode.charAt(0).toUpperCase()+mode.slice(1);
-    await this.apply(mode==='auto' ? {whiteBalanceMode:'continuous'} : {whiteBalanceMode:'manual',colorTemperature:temps[mode]||5500});
-  },
-
-  toggleControls() {
-    const p = document.getElementById('cam-controls');
-    const b = document.getElementById('toggle-cam-controls');
-    const open = p.style.display === 'block';
-    p.style.display = open ? 'none' : 'block';
-    b.textContent = open ? '🎛 Camera controls' : '✕ Close controls';
-  },
-};
-
-$('leave-btn').addEventListener('click', ()=>{
-  S.localStream?.getTracks().forEach(t=>t.stop());
-  S.ws?.close();
-  S.peers.forEach(pc=>pc.close());
-  cancelAnimationFrame(S.vuFrame);
-  show('screen-join');
+// FLIP
+$('flip-btn').addEventListener('click', async () => {
+  const newFacing = facingMode === 'user' ? 'environment' : 'user';
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: newFacing }, audio: false
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+    if (!newTrack) return;
+    const vid = $('live-video');
+    vid.srcObject = new MediaStream([newTrack, ...localStream.getAudioTracks()]);
+    localStream.getVideoTracks().forEach(t => t.stop());
+    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
+    localStream.addTrack(newTrack);
+    facingMode = newFacing;
+    $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
+    vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+  } catch(e) { log('Flip failed: ' + e.message, true); }
 });
 
-// ── AUTO JOIN FROM URL PARAM ──────────────────────────────────
-if (urlRoom) {
-  $('room-code').value = urlRoom.toUpperCase();
-  clearError();
+// MONITOR (hear yourself through earphones)
+let monitoring = false;
+$('monitor-btn').addEventListener('click', () => {
+  monitoring = !monitoring;
+  const audio = $('monitor-audio');
+  if (monitoring && localStream) {
+    // Play mic through phone speaker/earphone
+    audio.srcObject = new MediaStream(localStream.getAudioTracks());
+    audio.play().catch(() => {});
+    $('monitor-btn').textContent = 'On';
+    $('monitor-btn').className   = 'ctrl muted';
+    log('Mic monitoring ON — use headphones to avoid echo', true);
+  } else {
+    audio.srcObject = null;
+    $('monitor-btn').textContent = 'Off';
+    $('monitor-btn').className   = 'ctrl';
+  }
+});
+
+// MUTE / CAM OFF
+$('mute-btn').addEventListener('click', () => {
+  micMuted = !micMuted;
+  localStream?.getAudioTracks().forEach(t => t.enabled = !micMuted);
+  $('mute-btn').textContent = micMuted ? '🔇 Mic off' : '🎤 Mic on';
+  $('mute-btn').className   = 'ctrl' + (micMuted ? ' muted' : '');
+  $('mic-dot').className    = 'dot ' + (micMuted ? 'red' : 'green');
+});
+
+$('cam-btn').addEventListener('click', () => {
+  camOff = !camOff;
+  localStream?.getVideoTracks().forEach(t => t.enabled = !camOff);
+  $('cam-btn').textContent = camOff ? '🚫 Cam off' : '📷 Cam on';
+  $('cam-btn').className   = 'ctrl' + (camOff ? ' muted' : '');
+});
+
+// CHAT
+$('chat-send').addEventListener('click', sendChat);
+$('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+function sendChat() {
+  const t = $('chat-input').value.trim();
+  if (!t) return;
+  send({ type:'chat', text:t });
+  log('You: ' + t);
+  $('chat-input').value = '';
 }
+
+// LEAVE
+$('leave-btn').addEventListener('click', () => {
+  localStream?.getTracks().forEach(t => t.stop());
+  ws?.close();
+  peers.forEach(pc => pc.close());
+  cancelAnimationFrame(vuFrame);
+  show('screen-join');
+});
 </script>
 </body>
 </html>
