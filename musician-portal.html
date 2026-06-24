@@ -597,9 +597,8 @@ async function switchCamera(){
     const nextCam = await pickNextCamera();
     oldTrack = S.localStream?.getVideoTracks()[0];
     const oldSettings = oldTrack?.getSettings?.() || {};
-    const oldDeviceId = oldSettings.deviceId || '';
     currentFacing = oldSettings.facingMode || currentFacing;
-    const targetFacing = currentFacing === 'user' ? 'environment' : 'user';
+    const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
     audioTracks = S.localStream?.getAudioTracks() || [];
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -610,48 +609,29 @@ async function switchCamera(){
       await sleep(350);
     }
 
-    const labelledCameras = S.camList
-      .filter(cam => targetFacing === 'environment' ? isBackCamera(cam) : isFrontCamera(cam))
-      .filter(cam => cam.deviceId && cam.deviceId !== oldDeviceId);
     const attempts = [
-      { label:'exact '+targetFacing, video:{ facingMode: { exact: targetFacing } } },
-      ...labelledCameras.map(cam => ({ label:'labelled '+targetFacing, video:{ deviceId: { exact: cam.deviceId } } })),
-      nextCam && nextCam.deviceId !== oldDeviceId ? { label:'selected device', video:{ deviceId: { exact: nextCam.deviceId } } } : null,
-      { label:'ideal '+targetFacing, video:{ facingMode: { ideal: targetFacing } } },
+      { label:'ideal '+fallbackFacing, video:{ facingMode: { ideal: fallbackFacing } } },
+      { label:'plain '+fallbackFacing, video:{ facingMode: fallbackFacing } },
+      nextCam ? { label:'selected device', video:{ deviceId: { exact: nextCam.deviceId } } } : null,
+      fallbackFacing === 'environment' ? { label:'exact environment', video:{ facingMode: { exact: 'environment' } } } : null,
+      { label:'any camera', video:true },
     ].filter(Boolean);
 
     let newStream = null;
-    let newTrack = null;
     let lastError = null;
     let usedAttempt = '';
     for (const attempt of attempts) {
       try {
-        const candidateStream = await navigator.mediaDevices.getUserMedia({ video: attempt.video, audio:false });
-        const candidateTrack = candidateStream.getVideoTracks()[0];
-        const candidateSettings = candidateTrack?.getSettings?.() || {};
-        const candidateId = candidateSettings.deviceId || '';
-        const candidateDevice = S.camList.find(cam => cam.deviceId === candidateId);
-        const facingMatches = candidateSettings.facingMode
-          ? candidateSettings.facingMode === targetFacing
-          : targetFacing === 'environment'
-            ? isBackCamera(candidateDevice)
-            : isFrontCamera(candidateDevice);
-
-        if (candidateTrack && facingMatches) {
-          newStream = candidateStream;
-          newTrack = candidateTrack;
-          usedAttempt = attempt.label;
-          break;
-        }
-
-        candidateStream.getTracks().forEach(track => track.stop());
-        lastError = new Error('Chrome returned the same/default camera for '+attempt.label);
+        newStream = await navigator.mediaDevices.getUserMedia({ video: attempt.video, audio:false });
+        usedAttempt = attempt.label;
+        break;
       } catch(err) {
         lastError = err;
         await sleep(200);
       }
     }
     if (!newStream) throw lastError || new Error('Camera unavailable');
+    const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) throw new Error('No video track returned');
 
     await Promise.all([...S.peers.values()].map(pc => {
@@ -665,11 +645,9 @@ async function switchCamera(){
     await $('local-video').play().catch(()=>{});
 
     const settings = newTrack.getSettings?.() || {};
-    S.facingMode = settings.facingMode || targetFacing;
+    S.facingMode = settings.facingMode || fallbackFacing;
     await loadCameras();
-    const newDeviceId = settings.deviceId || '';
-    const changed = (oldDeviceId && newDeviceId && oldDeviceId !== newDeviceId) || S.facingMode !== currentFacing;
-    chatLog('', changed ? `Camera switched to ${S.facingMode} (${usedAttempt})` : `Chrome reopened the same camera (${usedAttempt})`, true);
+    chatLog('', `Camera switched (${usedAttempt})`, true);
   } catch(e) {
     try {
       const restoreFacing = currentFacing || 'user';
