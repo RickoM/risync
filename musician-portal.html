@@ -318,53 +318,46 @@ async function handleOffer(fromPeerId, sdp) {
 $('flip-btn').addEventListener('click', async () => {
   const newFacing = facingMode === 'user' ? 'environment' : 'user';
   const vid = $('live-video');
-  log('Flipping to: ' + newFacing, true);
+  const oldTrack = localStream.getVideoTracks()[0];
 
   try {
-    // List all cameras first
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter(d => d.kind === 'videoinput');
-    log('Cameras: ' + cameras.map(c => c.label||c.deviceId.slice(0,8)).join(', '), true);
-
-    // Find current camera index
-    const currentTrack = localStream.getVideoTracks()[0];
-    const currentSettings = currentTrack ? currentTrack.getSettings() : {};
-    const currentId = currentSettings.deviceId;
-    const currentIdx = cameras.findIndex(c => c.deviceId === currentId);
-    log('Current cam index: ' + currentIdx + ' of ' + cameras.length, true);
-
-    if (cameras.length < 2) {
-      log('Only one camera found — cannot flip', true);
-      return;
-    }
-
-    // Pick the other camera by index
-    const nextIdx = currentIdx === 0 ? cameras.length - 1 : 0;
-    const nextCam = cameras[nextIdx];
-    log('Switching to: ' + (nextCam.label||nextCam.deviceId.slice(0,8)), true);
-
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: nextCam.deviceId } },
-      audio: false
+    // Release track from peer connections first
+    peers.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track === oldTrack);
+      if (sender) sender.replaceTrack(null);
     });
 
-    const newTrack = newStream.getVideoTracks()[0];
-    if (!newTrack) { log('No track from new camera', true); return; }
+    // Stop old track — peer connection senders are now null so camera is released
+    if (oldTrack) oldTrack.stop();
+    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
 
+    // Small wait for camera hardware to release
+    await new Promise(r => setTimeout(r, 300));
+
+    // Open new camera
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: newFacing }, audio: false
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+
+    // Add to localStream
+    localStream.addTrack(newTrack);
+
+    // Replace track in peer connections
+    peers.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track === null || s.track?.kind === 'video');
+      if (sender) sender.replaceTrack(newTrack);
+    });
+
+    // Update preview
     vid.srcObject = new MediaStream([newTrack, ...localStream.getAudioTracks()]);
     vid.play().catch(() => {});
     facingMode = newFacing;
     $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
     vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-    log('Flip done', true);
 
   } catch(e) {
-    log('Flip error: ' + e.message, true);
-    // Restore previous stream if it failed
-    if (localStream.getVideoTracks().length > 0) {
-      vid.srcObject = localStream;
-      vid.play().catch(() => {});
-    }
+    log('Flip failed: ' + e.message, true);
   }
 });
 
