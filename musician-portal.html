@@ -346,6 +346,10 @@ const BACKEND_API = 'https://risync-backend.onrender.com';
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // Free TURN server — needed on institutional/campus networks
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
 // ── STATE ────────────────────────────────────────────────────
@@ -466,19 +470,20 @@ async function handleMessage(msg){
       $('conn-label').textContent='Connected';
       $('cam-dot').style.background='var(--green)'; $('cam-label').textContent='Cam live';
       $('mic-dot').style.background='var(--green)'; $('mic-label').textContent='Mic live';
-      renderParticipants(msg.room.participants);
-      $('host-name-live').textContent = msg.room.hostName;
-      chatLog('', `You joined "${msg.room.sessionName}"`, true);
-      // Create peer connections to all existing participants
-      msg.room.participants.forEach(p => {
-        if(p.peerId !== S.peerId) createPeerConnection(p.peerId, true);
-      });
+      if(msg.room) {
+        if(msg.room.participants) renderParticipants(msg.room.participants);
+        if(msg.room.hostName) $('host-name-live').textContent = msg.room.hostName;
+        chatLog('', `You joined "${msg.room.sessionName||'Session'}"`, true);
+      } else {
+        chatLog('', 'Joined session — waiting for host video...', true);
+      }
+      // Phone waits for studio to send offer — do NOT initiate
       break;
 
     case 'peer-joined':
-      chatLog('', `${msg.name} joined the session`, true);
+      chatLog('', `${msg.name||'Host'} joined`, true);
       addParticipantItem(msg);
-      createPeerConnection(msg.peerId, false);
+      // Phone does NOT initiate — waits for offer from studio
       break;
 
     case 'peer-left':
@@ -516,37 +521,61 @@ async function handleMessage(msg){
 }
 
 // ── WEBRTC ────────────────────────────────────────────────────
-function createPeerConnection(targetPeerId, initiate){
+function createPeerConnection(targetPeerId){
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   S.peers.set(targetPeerId, pc);
 
-  // Add local tracks
-  S.localStream.getTracks().forEach(track => pc.addTrack(track, S.localStream));
+  // Add ALL local tracks so studio receives phone camera + mic
+  if(S.localStream){
+    S.localStream.getTracks().forEach(track => {
+      pc.addTrack(track, S.localStream);
+      console.log('[Phone] Added track:', track.kind, track.label);
+    });
+  } else {
+    console.warn('[Phone] No local stream yet when creating peer connection');
+  }
 
   pc.onicecandidate = e => {
-    if(e.candidate) send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
+    if(e.candidate){
+      console.log('[Phone] Sending ICE candidate');
+      send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log('[Phone] ICE state:', pc.iceConnectionState);
+    if(pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed'){
+      chatLog('', 'Video connected to studio!', true);
+      $('conn-dot').style.background='var(--green)';
+      $('conn-label').textContent='Streaming';
+    }
   };
 
   pc.onconnectionstatechange = () => {
-    if(pc.connectionState === 'connected') chatLog('', 'P2P connection established', true);
-    if(pc.connectionState === 'failed') { pc.restartIce(); }
+    console.log('[Phone] Connection state:', pc.connectionState);
+    if(pc.connectionState === 'connected') chatLog('', 'Live in studio!', true);
+    if(pc.connectionState === 'failed'){
+      console.log('[Phone] Connection failed — restarting ICE');
+      pc.restartIce();
+    }
   };
 
-  if(initiate){
-    pc.createOffer().then(offer => {
-      pc.setLocalDescription(offer);
-      send({ type:'offer', targetPeerId, sdp:offer.sdp });
-    });
-  }
   return pc;
 }
 
 async function handleOffer(fromPeerId, sdp){
-  const pc = createPeerConnection(fromPeerId, false);
-  await pc.setRemoteDescription({ type:'offer', sdp });
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  send({ type:'answer', targetPeerId:fromPeerId, sdp:answer.sdp });
+  console.log('[Phone] Received offer from:', fromPeerId);
+  const pc = createPeerConnection(fromPeerId);
+  try {
+    await pc.setRemoteDescription({ type:'offer', sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    console.log('[Phone] Sending answer');
+    send({ type:'answer', targetPeerId:fromPeerId, sdp:answer.sdp });
+  } catch(e) {
+    console.error('[Phone] handleOffer error:', e);
+    chatLog('', 'Video error: ' + e.message, true);
+  }
 }
 
 // ── PARTICIPANTS ──────────────────────────────────────────────
