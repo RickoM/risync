@@ -594,8 +594,11 @@ async function switchCamera(){
   try {
     const nextCam = await pickNextCamera();
     oldTrack = S.localStream?.getVideoTracks()[0];
-    const currentFacing = oldTrack?.getSettings?.().facingMode || S.facingMode;
+    const oldSettings = oldTrack?.getSettings?.() || {};
+    const oldDeviceId = oldSettings.deviceId || '';
+    const currentFacing = oldSettings.facingMode || S.facingMode;
     const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
+    const audioTracks = S.localStream?.getAudioTracks() || [];
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     // Mobile browsers often cannot open a second camera until the first track is stopped.
@@ -606,18 +609,20 @@ async function switchCamera(){
     }
 
     const attempts = [
-      { facingMode: { ideal: fallbackFacing } },
-      { facingMode: fallbackFacing },
-      nextCam ? { deviceId: { exact: nextCam.deviceId } } : null,
-      fallbackFacing === 'environment' ? { facingMode: { exact: 'environment' } } : null,
-      true,
+      { label:'ideal '+fallbackFacing, video:{ facingMode: { ideal: fallbackFacing } } },
+      { label:'plain '+fallbackFacing, video:{ facingMode: fallbackFacing } },
+      fallbackFacing === 'environment' ? { label:'exact environment', video:{ facingMode: { exact: 'environment' } } } : null,
+      nextCam ? { label:'selected device', video:{ deviceId: { exact: nextCam.deviceId } } } : null,
+      { label:'any camera', video:true },
     ].filter(Boolean);
 
     let newStream = null;
     let lastError = null;
-    for (const video of attempts) {
+    let usedAttempt = '';
+    for (const attempt of attempts) {
       try {
-        newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+        newStream = await navigator.mediaDevices.getUserMedia({ video: attempt.video, audio:false });
+        usedAttempt = attempt.label;
         break;
       } catch(err) {
         lastError = err;
@@ -634,14 +639,17 @@ async function switchCamera(){
       return sender ? sender.replaceTrack(newTrack) : Promise.resolve();
     }));
 
-    S.localStream.addTrack(newTrack);
+    S.localStream = new MediaStream([...audioTracks, newTrack]);
     newTrack.enabled = !S.camOff;
     $('local-video').srcObject = S.localStream;
+    await $('local-video').play().catch(()=>{});
 
     const settings = newTrack.getSettings?.() || {};
     S.facingMode = settings.facingMode || (nextCam && isFrontCamera(nextCam) ? 'user' : 'environment');
     await loadCameras();
-    chatLog('', 'Camera switched', true);
+    const newDeviceId = settings.deviceId || '';
+    const changed = (oldDeviceId && newDeviceId && oldDeviceId !== newDeviceId) || (settings.facingMode && settings.facingMode !== currentFacing);
+    chatLog('', changed ? `Camera switched (${usedAttempt})` : `Chrome reopened the same camera (${usedAttempt})`, true);
   } catch(e) {
     chatLog('', 'Camera switch failed: ' + e.message, true);
   }
