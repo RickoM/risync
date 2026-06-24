@@ -520,12 +520,12 @@ async function flipCamera(){
       audio: false,
     });
     const newTrack = newStream.getVideoTracks()[0];
+    chatLog('', 'Got track: ' + newTrack.label + ' enabled:' + newTrack.enabled + ' state:' + newTrack.readyState, true);
     const label    = nextCam.label.toLowerCase();
     const isFront  = label.includes('front') || label.includes('forward') || label.includes('user') || label.includes('selfie');
-    // no mirror
     const newSrc = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
     $('local-video').srcObject = newSrc;
-    $('local-video').play().catch(()=>{});
+    $('local-video').play().catch(e => chatLog('', 'play error: '+e.message, true));
     $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
     S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
     S.localStream.addTrack(newTrack);
