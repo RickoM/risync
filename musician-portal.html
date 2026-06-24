@@ -327,7 +327,13 @@ $('allow-btn').addEventListener('click', async () => {
     setupVU();
     show('screen-live');
     connectWS();
-    loadCameras(); // pre-load camera list for flip
+    loadCameras().then(() => {
+      const track = S.localStream.getVideoTracks()[0];
+      const id = track?.getSettings()?.deviceId;
+      const found = S.camList.findIndex(d => d.deviceId === id);
+      chatLog('', 'Active cam idx: ' + found + ' label: ' + (S.camList[found]?.label||'?'), true);
+      chatLog('', 'All cams: ' + S.camList.map((c,i)=>i+':'+c.label.slice(0,20)).join(' | '), true);
+    });
   } catch(e){
     show('screen-join');
     showError('Camera/mic denied: ' + e.message);
@@ -503,8 +509,9 @@ async function flipCamera(){
   if (!S.camList.length) await loadCameras();
   if (S.camList.length < 2) { chatLog('', 'Only one camera found', true); return; }
 
-  // Move to next camera
-  S.camIdx = (S.camIdx + 1) % S.camList.length;
+  // Toggle between index 0 (front) and index 1 (rear only)
+  // Skip index 2 — it's a duplicate rear camera that fails
+  S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
 
   S.localStream.getVideoTracks().forEach(t=>t.stop());
