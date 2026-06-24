@@ -596,25 +596,35 @@ async function switchCamera(){
     oldTrack = S.localStream?.getVideoTracks()[0];
     const currentFacing = oldTrack?.getSettings?.().facingMode || S.facingMode;
     const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     // Mobile browsers often cannot open a second camera until the first track is stopped.
     if (oldTrack) {
       S.localStream.removeTrack(oldTrack);
       oldTrack.stop();
+      await sleep(350);
     }
 
-    let newStream;
-    try {
-      newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} },
-        audio: false,
-      });
-    } catch(exactFacingError) {
-      const video = nextCam
-        ? { deviceId: { exact: nextCam.deviceId }, width:{ideal:1280}, height:{ideal:720} }
-        : { facingMode: { ideal: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} };
-      newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+    const attempts = [
+      { facingMode: { ideal: fallbackFacing } },
+      { facingMode: fallbackFacing },
+      nextCam ? { deviceId: { exact: nextCam.deviceId } } : null,
+      fallbackFacing === 'environment' ? { facingMode: { exact: 'environment' } } : null,
+      true,
+    ].filter(Boolean);
+
+    let newStream = null;
+    let lastError = null;
+    for (const video of attempts) {
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+        break;
+      } catch(err) {
+        lastError = err;
+        await sleep(200);
+      }
     }
+    if (!newStream) throw lastError || new Error('Camera unavailable');
 
     const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) throw new Error('No video track returned');
