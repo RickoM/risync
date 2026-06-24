@@ -314,12 +314,13 @@ $('join-btn').addEventListener('click', () => {
 $('allow-btn').addEventListener('click', async () => {
   try {
     S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} },
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} },
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
+    S.facingMode = 'environment';
     $('local-video').srcObject = S.localStream;
     // no mirror
-    $('cam-label-overlay').textContent = S.label || S.name;
+    $('cam-label-overlay').textContent = '📷 Rear';
     $('cam-dot').className = 'pill-dot green';
     $('cam-label').textContent = 'Cam live';
     $('mic-dot').className = 'pill-dot green';
@@ -331,8 +332,9 @@ $('allow-btn').addEventListener('click', async () => {
       const track = S.localStream.getVideoTracks()[0];
       const id = track?.getSettings()?.deviceId;
       const found = S.camList.findIndex(d => d.deviceId === id);
-      chatLog('', 'Active cam idx: ' + found + ' label: ' + (S.camList[found]?.label||'?'), true);
-      chatLog('', 'All cams: ' + S.camList.map((c,i)=>i+':'+c.label.slice(0,20)).join(' | '), true);
+      S.camIdx = found >= 0 ? found : 1; // start on rear camera index
+      chatLog('', 'Cams: ' + S.camList.map((c,i)=>i+':'+c.label.slice(0,25)).join(' | '), true);
+      chatLog('', 'Active idx: ' + S.camIdx, true);
     });
   } catch(e){
     show('screen-join');
