@@ -761,7 +761,6 @@ async function flipCamera(){
     const sender=pc.getSenders().find(s=>s.track?.kind==='video');
     if(sender) sender.replaceTrack(newTrack);
   });
-  CAM.init(S.localStream);
   $('cam-label-overlay').textContent = S.facingMode==='environment' ? 'Rear Camera' : 'Front Camera';
 }
 
