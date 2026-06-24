@@ -246,8 +246,38 @@ input:focus,select:focus{border-color:var(--amber)}
       <strong style="color:var(--bright)">Android:</strong> Chrome works best. Tap Allow when prompted.
     </div>
     <button class="btn btn-primary" id="allow-btn">Allow camera &amp; continue →</button>
+    <div id="cam-debug" style="margin-top:12px;font-family:var(--fm);font-size:.62rem;color:var(--subtle);word-break:break-all;display:none"></div>
+    <button onclick="checkCamSupport()" class="btn btn-secondary" style="margin-top:10px;font-size:.65rem;padding:6px 14px">🔍 Check camera support</button>
   </div>
 </div>
+
+<script>
+function checkCamSupport() {
+  const d = document.getElementById('cam-debug');
+  d.style.display = 'block';
+  const lines = [];
+  lines.push('mediaDevices: ' + (!!navigator.mediaDevices));
+  lines.push('getUserMedia: ' + (!!navigator.mediaDevices?.getUserMedia));
+  lines.push('protocol: ' + location.protocol);
+  lines.push('host: ' + location.hostname);
+  lines.push('isSecure: ' + (location.protocol === 'https:'));
+  if (navigator.mediaDevices) {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      const mics = devices.filter(d => d.kind === 'audioinput');
+      lines.push('cameras found: ' + cams.length);
+      lines.push('mics found: ' + mics.length);
+      cams.forEach((c,i) => lines.push('cam'+i+': ' + (c.label||'(no label)')));
+      d.innerHTML = lines.join('<br>');
+    }).catch(e => {
+      lines.push('enumerate error: ' + e.message);
+      d.innerHTML = lines.join('<br>');
+    });
+  } else {
+    d.innerHTML = lines.join('<br>');
+  }
+}
+</script>
 
 <!-- ── SCREEN 3: LIVE ─────────────────────────────────── -->
 <div class="screen" id="screen-live">
@@ -365,37 +395,41 @@ $('join-btn').addEventListener('click', () => {
   show('screen-perms');
 });
 
-$('allow-btn').addEventListener('click', async () => {
-  // Check browser support first
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    show('screen-join');
-    showError('Camera not supported on this browser. Use Chrome or Safari.');
-    return;
-  }
-  try {
-    // Try video + audio first
-    S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facingMode },
-      audio: true,
-    });
-    $('local-video').srcObject = S.localStream;
-    $('cam-label-overlay').textContent = S.label || S.name;
-    setupVU();
-    show('screen-live');
-    connectWS();
-  } catch(e){
-    // If video+audio fails, try video only
-    try {
-      S.localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: S.facingMode } });
-      $('local-video').srcObject = S.localStream;
-      show('screen-live');
-      connectWS();
-      chatLog('', 'Mic permission denied — video only', true);
-    } catch(e2){
-      show('screen-join');
-      showError('Camera access denied. On your phone: Settings → Browser → Camera → Allow. Then try again.');
-    }
-  }
+$('allow-btn').addEventListener('click', () => {
+  const btn = $('allow-btn');
+  btn.textContent = 'Starting camera...';
+  btn.disabled = true;
+
+  // Simple sequential attempts
+  const tryCamera = (constraints) => {
+    return navigator.mediaDevices.getUserMedia(constraints)
+      .then(stream => {
+        S.localStream = stream;
+        $('local-video').srcObject = stream;
+        $('cam-label-overlay').textContent = S.label || S.name || 'Camera';
+        show('screen-live');
+        connectWS();
+        if (!stream.getAudioTracks().length) {
+          chatLog('', 'Video only — no microphone', true);
+        }
+      });
+  };
+
+  // Try 1: video + audio
+  tryCamera({ video: true, audio: true })
+  .catch(() =>
+    // Try 2: video only
+    tryCamera({ video: true, audio: false })
+  )
+  .catch(() =>
+    // Try 3: any camera, no constraints
+    tryCamera({ video: { facingMode: 'environment' }, audio: false })
+  )
+  .catch(err => {
+    btn.textContent = 'Allow camera & continue →';
+    btn.disabled = false;
+    showError('Cannot access camera: ' + err.message + '. Check Chrome site settings for rickom.github.io');
+  });
 });
 
 // ── WEBSOCKET ─────────────────────────────────────────────────
