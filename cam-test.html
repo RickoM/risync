@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camera Test</title>
+<style>
+body { font-family: monospace; background: #111; color: #0f0; padding: 16px; font-size: 14px; }
+video { width: 100%; max-width: 400px; border: 2px solid #0f0; display: block; margin: 10px 0; background: #000; aspect-ratio: 4/3; }
+button { background: #0f0; color: #000; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer; margin: 5px; border-radius: 4px; }
+.log { background: #000; border: 1px solid #333; padding: 10px; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.8; }
+.ok  { color: #0f0; }
+.err { color: #f44; }
+.inf { color: #ff0; }
+</style>
+</head>
+<body>
+
+<h2>📷 Camera Diagnostic</h2>
+<video id="vid" autoplay muted playsinline></video>
+<div class="log" id="log"></div>
+<button onclick="runTest()">▶ Run full test</button>
+<button onclick="stopAll()">■ Stop</button>
+
+<script>
+let currentStream = null;
+
+function log(msg, type='inf') {
+  const d = document.getElementById('log');
+  d.innerHTML += `<div class="${type}">${msg}</div>`;
+  d.scrollTop = d.scrollHeight;
+}
+
+function stopAll() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => { t.stop(); log('Stopped: ' + t.label); });
+    currentStream = null;
+    document.getElementById('vid').srcObject = null;
+  }
+}
+
+async function tryCamera(label, constraints) {
+  log(`--- Trying: ${label} ---`);
+  log('Constraints: ' + JSON.stringify(constraints));
+  try {
+    stopAll();
+    await new Promise(r => setTimeout(r, 500));
+    const stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
+    currentStream = stream;
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    log(`✅ SUCCESS`, 'ok');
+    log(`Track: ${track.label}`, 'ok');
+    log(`State: ${track.readyState}`, 'ok');
+    log(`Settings: ${JSON.stringify(settings)}`, 'ok');
+    document.getElementById('vid').srcObject = stream;
+    document.getElementById('vid').play();
+    await new Promise(r => setTimeout(r, 2000));
+    return true;
+  } catch(e) {
+    log(`❌ FAILED: ${e.name}: ${e.message}`, 'err');
+    return false;
+  }
+}
+
+async function runTest() {
+  document.getElementById('log').innerHTML = '';
+  log('=== CAMERA DIAGNOSTIC ===');
+  log('Browser: ' + navigator.userAgent.slice(0,80));
+
+  // Step 1: Enumerate
+  log('\n--- Enumerating devices ---');
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cams = devices.filter(d => d.kind === 'videoinput');
+  log(`Found ${cams.length} cameras:`);
+  cams.forEach((c, i) => log(`  [${i}] ${c.label || 'No label'} | id: ${c.deviceId.slice(0,12)}...`));
+
+  // Step 2: Try facingMode user
+  await tryCamera('facingMode: user', { facingMode: 'user' });
+
+  // Step 3: Try facingMode environment  
+  await tryCamera('facingMode: environment', { facingMode: 'environment' });
+
+  // Step 4: Try each camera by deviceId
+  for (let i = 0; i < cams.length; i++) {
+    await tryCamera(`deviceId[${i}]: ${cams[i].label.slice(0,30)}`, { deviceId: { exact: cams[i].deviceId } });
+  }
+
+  // Step 5: Try plain video: true
+  await tryCamera('video: true (no constraints)', true);
+
+  log('\n=== TEST COMPLETE ===', 'ok');
+  stopAll();
+}
+</script>
+</body>
+</html>
