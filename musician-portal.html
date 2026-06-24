@@ -431,7 +431,7 @@ const ICE_SERVERS = [
 // ── STATE ────────────────────────────────────────────────────
 const S = {
   ws: null, peerId: null, roomId: null,
-  localStream: null, facingMode: 'environment',
+  localStream: null, facingMode: 'user',
   peers: new Map(), // peerId → RTCPeerConnection
   micMuted: false, camOff: false,
   audioCtx: null, analyser: null, vuFrame: null,
@@ -488,7 +488,7 @@ $('allow-btn').addEventListener('click', () => {
 
   // Request rear camera + mic together
   const videoConstraints = {
-    facingMode: { ideal: 'environment' }, // rear camera preferred
+    facingMode: 'user',
     width:  { ideal: 1280 },
     height: { ideal: 720 },
   };
@@ -516,7 +516,6 @@ $('allow-btn').addEventListener('click', () => {
   })
   .then(stream => {
     S.localStream = stream;
-    S.facingMode  = 'environment'; // we requested rear cam
 
     const hasVideo = stream.getVideoTracks().length > 0;
     const hasAudio = stream.getAudioTracks().length > 0;
@@ -747,68 +746,20 @@ function toggleCam(){
 }
 
 async function flipCamera(){
-  // Toggle facing mode
-  const newFacing = S.facingMode === 'environment' ? 'user' : 'environment';
-
-  try {
-    // Stop current video track
-    S.localStream.getVideoTracks().forEach(t => t.stop());
-
-    // Use exact to force the specific camera
-    let newStream;
-    try {
-      newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: newFacing } },
-        audio: false,
-      });
-    } catch(e) {
-      // exact failed — enumerate devices and pick by label
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      console.log('[Flip] Video devices:', videoDevices.map(d => d.label));
-
-      // Find front or back camera by label
-      const keyword = newFacing === 'user' ? ['front', 'selfie', '1'] : ['back', 'rear', 'environment', '0'];
-      const target = videoDevices.find(d => keyword.some(k => d.label.toLowerCase().includes(k)))
-                  || videoDevices[newFacing === 'user' ? 0 : videoDevices.length - 1];
-
-      if (target) {
-        newStream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: target.deviceId } },
-          audio: false,
-        });
-      } else {
-        // Last resort
-        newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      }
-    }
-
-    const newTrack = newStream.getVideoTracks()[0];
-    console.log('[Flip] New track:', newTrack.label, newTrack.getSettings().facingMode);
-
-    // Update state
-    S.facingMode = newFacing;
-
-    // Update preview
-    const audioTracks = S.localStream.getAudioTracks();
-    $('local-video').srcObject = new MediaStream([newTrack, ...audioTracks]);
-
-    // Update localStream
-    S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
-    S.localStream.addTrack(newTrack);
-
-    // Update peer connections
-    S.peers.forEach(pc => {
-      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) sender.replaceTrack(newTrack);
-    });
-
-    $('cam-label-overlay').textContent = newFacing === 'environment' ? 'Rear Camera' : 'Front Camera';
-
-  } catch(e) {
-    console.error('[Flip] Failed:', e);
-    chatLog('', 'Flip failed: ' + e.message, true);
-  }
+  S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
+  S.localStream.getVideoTracks().forEach(t=>t.stop());
+  const newStream = await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:S.facingMode},
+    audio:false,
+  });
+  const newTrack = newStream.getVideoTracks()[0];
+  $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
+  S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
+  S.localStream.addTrack(newTrack);
+  S.peers.forEach(pc=>{
+    const sender=pc.getSenders().find(s=>s.track?.kind==='video');
+    if(sender) sender.replaceTrack(newTrack);
+  });
 }
 
 // ── CHAT ──────────────────────────────────────────────────────
