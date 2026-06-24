@@ -313,8 +313,18 @@ $('join-btn').addEventListener('click', () => {
 // ALLOW CAM + MIC — exact same as original working version
 $('allow-btn').addEventListener('click', async () => {
   try {
+    // Enumerate cameras first, pick rear by deviceId
+    const allDevices = await navigator.mediaDevices.enumerateDevices();
+    const allCams = allDevices.filter(d => d.kind === 'videoinput');
+    // Find rear camera — label contains 'back' or 'environment', else use last device
+    const rearCam = allCams.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'))
+                 || allCams[allCams.length - 1];
+    const videoConstraint = rearCam?.deviceId
+      ? { deviceId: { exact: rearCam.deviceId } }
+      : { facingMode: 'environment' };
+
     S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} },
+      video: videoConstraint,
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
     S.facingMode = 'environment';
