@@ -314,23 +314,23 @@ async function handleOffer(fromPeerId, sdp) {
   send({ type:'answer', sdp:answer.sdp, targetPeerId:fromPeerId });
 }
 
-// FLIP
+// FLIP — open new camera WITHOUT stopping old one
+// This keeps peer connection alive
 $('flip-btn').addEventListener('click', async () => {
-  facingMode = facingMode === 'user' ? 'environment' : 'user';
-  localStream.getVideoTracks().forEach(t => t.stop());
+  const newFacing = facingMode === 'user' ? 'environment' : 'user';
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facingMode }, audio: false
+      video: { facingMode: newFacing }, audio: false
     });
     const newTrack = newStream.getVideoTracks()[0];
+    // Only update local preview — don't touch localStream or peer connection
     const vid = $('live-video');
     vid.srcObject = new MediaStream([newTrack, ...localStream.getAudioTracks()]);
-    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
-    localStream.addTrack(newTrack);
-    $('cam-name').textContent = facingMode === 'user' ? '🤳 Front' : '📷 Rear';
-    vid.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+    vid.play().catch(() => {});
+    facingMode = newFacing;
+    $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
+    vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
   } catch(e) {
-    facingMode = facingMode === 'user' ? 'environment' : 'user'; // revert
     log('Flip failed: ' + e.message, true);
   }
 });
