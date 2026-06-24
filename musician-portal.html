@@ -93,6 +93,22 @@ input:focus,select:focus{border-color:var(--amber)}
   color:var(--bright);border-radius:8px;padding:6px 10px;
   font-size:.75rem;cursor:pointer;
 }
+.camera-tools{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:12px;margin-bottom:14px;
+}
+.tool-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tool-row:last-child{margin-bottom:0}
+.tool-label{
+  width:54px;font-family:var(--fm);font-size:.63rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);
+}
+.tool-row input[type=range]{flex:1;accent-color:var(--amber)}
+.tool-value{width:42px;text-align:right;font-family:var(--fm);font-size:.65rem;color:var(--subtle)}
+.tool-select{
+  flex:1;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;color:var(--bright);font-size:.78rem;padding:8px 10px;
+}
 .meter-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .meter-label{font-family:var(--fm);font-size:.65rem;color:var(--subtle);width:36px}
 .meter-track{flex:1;height:8px;background:var(--panel);border-radius:4px;overflow:hidden}
@@ -236,6 +252,25 @@ input:focus,select:focus{border-color:var(--amber)}
     <div class="cam-label" id="cam-label-overlay">Your camera</div>
     <button class="flip-btn" id="flip-btn">⟳ Flip</button>
   </div>
+  <div class="camera-tools" id="camera-tools">
+    <div class="tool-row">
+      <div class="tool-label">Zoom</div>
+      <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" disabled>
+      <div class="tool-value" id="zoom-value">--</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-label">Focus</div>
+      <select class="tool-select" id="focus-mode" disabled>
+        <option value="continuous">Auto</option>
+        <option value="manual">Manual</option>
+      </select>
+    </div>
+    <div class="tool-row" id="focus-distance-row" style="display:none">
+      <div class="tool-label">Dist</div>
+      <input type="range" id="focus-distance" min="0" max="1" step="0.01" value="0" disabled>
+      <div class="tool-value" id="focus-value">--</div>
+    </div>
+  </div>
   <div class="meter-row">
     <div class="meter-label" style="font-size:.6rem">MIC</div>
     <div class="meter-track"><div class="meter-fill" id="mic-meter"></div></div>
@@ -344,6 +379,7 @@ $('allow-btn').addEventListener('click', async () => {
     $('local-video').srcObject = S.localStream;
     // no mirror
     $('cam-label-overlay').textContent = S.label || S.name;
+    updateCameraControls();
     $('cam-dot').className = 'pill-dot green';
     $('cam-label').textContent = 'Cam live';
     $('mic-dot').className = 'pill-dot green';
@@ -508,6 +544,9 @@ function setupVU(){
 $('mute-btn').addEventListener('click', toggleMic);
 $('cam-btn').addEventListener('click', toggleCam);
 $('flip-btn').addEventListener('click', flipCamera);
+$('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
+$('focus-mode').addEventListener('change', e => setFocusMode(e.target.value));
+$('focus-distance').addEventListener('input', e => setFocusDistance(parseFloat(e.target.value)));
 
 function toggleMic(){
   S.micMuted=!S.micMuted;
@@ -527,6 +566,90 @@ function toggleCam(){
 
 // FLIP — exact original working code
 // Store camera list and current index
+function activeVideoTrack() {
+  return S.localStream?.getVideoTracks()[0] || null;
+}
+
+function updateCameraControls() {
+  const track = activeVideoTrack();
+  const caps = track?.getCapabilities?.() || {};
+  const settings = track?.getSettings?.() || {};
+  const zoom = $('zoom-slider');
+  const zoomValue = $('zoom-value');
+  const focusMode = $('focus-mode');
+  const focusDistance = $('focus-distance');
+  const focusRow = $('focus-distance-row');
+  const focusValue = $('focus-value');
+
+  if (caps.zoom) {
+    zoom.disabled = false;
+    zoom.min = caps.zoom.min ?? 1;
+    zoom.max = caps.zoom.max ?? 1;
+    zoom.step = caps.zoom.step ?? 0.1;
+    zoom.value = settings.zoom ?? caps.zoom.min ?? 1;
+    zoomValue.textContent = Number(zoom.value).toFixed(1) + 'x';
+  } else {
+    zoom.disabled = true;
+    zoom.min = 1; zoom.max = 1; zoom.value = 1;
+    zoomValue.textContent = 'n/a';
+  }
+
+  const modes = caps.focusMode || [];
+  focusMode.disabled = !modes.length;
+  [...focusMode.options].forEach(opt => {
+    opt.disabled = modes.length && !modes.includes(opt.value);
+  });
+  if (modes.length) {
+    focusMode.value = settings.focusMode || (modes.includes('continuous') ? 'continuous' : modes[0]);
+  }
+
+  if (caps.focusDistance) {
+    focusRow.style.display = '';
+    focusDistance.disabled = focusMode.value !== 'manual';
+    focusDistance.min = caps.focusDistance.min ?? 0;
+    focusDistance.max = caps.focusDistance.max ?? 1;
+    focusDistance.step = caps.focusDistance.step ?? 0.01;
+    focusDistance.value = settings.focusDistance ?? caps.focusDistance.min ?? 0;
+    focusValue.textContent = Number(focusDistance.value).toFixed(2);
+  } else {
+    focusRow.style.display = 'none';
+    focusDistance.disabled = true;
+    focusValue.textContent = 'n/a';
+  }
+}
+
+async function applyCameraAdvanced(values) {
+  const track = activeVideoTrack();
+  if (!track?.applyConstraints) return false;
+  try {
+    await track.applyConstraints({ advanced: [values] });
+    return true;
+  } catch(e) {
+    chatLog('', 'Camera control unsupported: ' + e.message, true);
+    updateCameraControls();
+    return false;
+  }
+}
+
+async function setCameraZoom(value) {
+  const ok = await applyCameraAdvanced({ zoom: value });
+  if (ok) $('zoom-value').textContent = value.toFixed(1) + 'x';
+}
+
+async function setFocusMode(mode) {
+  const values = { focusMode: mode };
+  if (mode === 'manual' && !$('focus-distance').disabled) {
+    values.focusDistance = parseFloat($('focus-distance').value);
+  }
+  await applyCameraAdvanced(values);
+  updateCameraControls();
+}
+
+async function setFocusDistance(value) {
+  const ok = await applyCameraAdvanced({ focusMode: 'manual', focusDistance: value });
+  if (ok) $('focus-value').textContent = value.toFixed(2);
+}
+
 S.camList = [];
 S.camIdx  = 0;
 
@@ -702,6 +825,7 @@ async function switchCamera(){
     newTrack.enabled = !S.camOff;
     $('local-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
+    updateCameraControls();
 
     const settings = newTrack.getSettings?.() || {};
     S.facingMode = settings.facingMode || nextFacing;
@@ -716,6 +840,7 @@ async function switchCamera(){
         S.localStream = new MediaStream([...audioTracks, restoreTrack]);
         $('local-video').srcObject = S.localStream;
         await $('local-video').play().catch(()=>{});
+        updateCameraControls();
         await Promise.all([...S.peers.values()].map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           return sender ? sender.replaceTrack(restoreTrack) : Promise.resolve();
