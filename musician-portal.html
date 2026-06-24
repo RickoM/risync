@@ -334,7 +334,13 @@ const params      = new URLSearchParams(window.location.search);
 const urlRoom     = params.get('room') || '';
 const urlWS       = ''; // always use Render
 
+// Force wss:// — never allow ws:// from HTTPS page
 const BACKEND_WS  = 'wss://risync-backend.onrender.com';
+
+// Safety check — if somehow ws:// sneaks in, upgrade it
+function safeWsUrl(url) {
+  return url.replace(/^ws:\/\//i, 'wss://');
+}
 const BACKEND_API = 'https://risync-backend.onrender.com';
 
 const ICE_SERVERS = [
@@ -434,7 +440,7 @@ $('allow-btn').addEventListener('click', () => {
 
 // ── WEBSOCKET ─────────────────────────────────────────────────
 function connectWS(){
-  S.ws = new WebSocket(BACKEND_WS);
+  S.ws = new WebSocket(safeWsUrl(BACKEND_WS));
   S.ws.onopen = () => { $('conn-dot').style.background='var(--amber)'; $('conn-label').textContent='Connecting...'; };
   S.ws.onmessage = e => handleMessage(JSON.parse(e.data));
   S.ws.onclose = () => {

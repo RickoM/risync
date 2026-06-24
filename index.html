@@ -1841,15 +1841,14 @@ const REC = {
 
       case 'room-created':
         console.log('[RISYNC] Room ready:', msg.roomCode);
-        // Update QR with confirmed URL
-        if (msg.joinUrl) {
-          $('qr-url-text').textContent = msg.joinUrl;
-          this.drawQR(msg.roomCode, msg.joinUrl);
-          $('copy-qr-link-btn').onclick = () => {
-            navigator.clipboard.writeText(msg.joinUrl);
-            toast('Link copied!');
-          };
-        }
+        // Always use GitHub Pages URL — never use server-provided URL
+        const confirmedUrl = 'https://rickom.github.io/risync/musician-portal.html?room=' + msg.roomCode;
+        $('qr-url-text').textContent = confirmedUrl;
+        this.drawQR(msg.roomCode, confirmedUrl);
+        $('copy-qr-link-btn').onclick = () => {
+          navigator.clipboard.writeText(confirmedUrl);
+          toast('Link copied!');
+        };
         break;
 
       case 'peer-joined':
