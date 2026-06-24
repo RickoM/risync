@@ -746,20 +746,50 @@ function toggleCam(){
 }
 
 async function flipCamera(){
-  S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
-  S.localStream.getVideoTracks().forEach(t=>t.stop());
-  const newStream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:S.facingMode},
-    audio:false,
-  });
-  const newTrack = newStream.getVideoTracks()[0];
-  $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
-  S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
-  S.localStream.addTrack(newTrack);
-  S.peers.forEach(pc=>{
-    const sender=pc.getSenders().find(s=>s.track?.kind==='video');
-    if(sender) sender.replaceTrack(newTrack);
-  });
+  try {
+    S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
+
+    // Get new stream BEFORE stopping old one
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: S.facingMode },
+      audio: false,
+    });
+
+    const newTrack = newStream.getVideoTracks()[0];
+
+    // Update local preview only — don't touch peer connections yet
+    const audioTracks = S.localStream.getAudioTracks();
+    $('local-video').srcObject = new MediaStream([newTrack, ...audioTracks]);
+
+    // Stop OLD video tracks after new stream is live
+    S.localStream.getVideoTracks().forEach(t => t.stop());
+
+    // Update localStream reference
+    S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
+    S.localStream.addTrack(newTrack);
+
+    // Replace track in peers WITHOUT stopping the connection
+    // Use a small delay so new track is ready
+    setTimeout(() => {
+      S.peers.forEach(pc => {
+        try {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (sender && pc.connectionState !== 'closed') {
+            sender.replaceTrack(newTrack);
+          }
+        } catch(e) {
+          console.warn('[Flip] replaceTrack error:', e.message);
+        }
+      });
+    }, 300);
+
+    $('cam-label-overlay').textContent = S.facingMode === 'environment' ? '📷 Rear' : '🤳 Front';
+
+  } catch(e) {
+    console.error('[Flip] Error:', e.message);
+    // Revert facingMode on failure
+    S.facingMode = S.facingMode === 'user' ? 'environment' : 'user';
+  }
 }
 
 // ── CHAT ──────────────────────────────────────────────────────
