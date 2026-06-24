@@ -614,7 +614,6 @@ async function switchCamera(){
       { label:'plain '+fallbackFacing, video:{ facingMode: fallbackFacing } },
       nextCam ? { label:'selected device', video:{ deviceId: { exact: nextCam.deviceId } } } : null,
       fallbackFacing === 'environment' ? { label:'exact environment', video:{ facingMode: { exact: 'environment' } } } : null,
-      { label:'any camera', video:true },
     ].filter(Boolean);
 
     let newStream = null;
