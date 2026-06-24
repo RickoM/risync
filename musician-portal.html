@@ -431,7 +431,7 @@ const ICE_SERVERS = [
 // ── STATE ────────────────────────────────────────────────────
 const S = {
   ws: null, peerId: null, roomId: null,
-  localStream: null, facingMode: 'user',
+  localStream: null, facingMode: 'environment',
   peers: new Map(), // peerId → RTCPeerConnection
   micMuted: false, camOff: false,
   audioCtx: null, analyser: null, vuFrame: null,
@@ -486,36 +486,67 @@ $('allow-btn').addEventListener('click', () => {
   btn.textContent = 'Starting camera...';
   btn.disabled = true;
 
-  // Simple sequential attempts
-  const tryCamera = (constraints) => {
-    return navigator.mediaDevices.getUserMedia(constraints)
-      .then(stream => {
-        S.localStream = stream;
-        $('local-video').srcObject = stream;
-        $('cam-label-overlay').textContent = S.label || S.name || 'Camera';
-        show('screen-live');
-        connectWS();
-        CAM.init(stream); // init camera controls
-        if (!stream.getAudioTracks().length) {
-          chatLog('', 'Video only — no microphone', true);
-        }
-      });
+  // Request rear camera + mic together
+  const videoConstraints = {
+    facingMode: { ideal: 'environment' }, // rear camera preferred
+    width:  { ideal: 1280 },
+    height: { ideal: 720 },
   };
 
-  // Try 1: video + audio
-  tryCamera({ video: true, audio: true })
-  .catch(() =>
-    // Try 2: video only
-    tryCamera({ video: true, audio: false })
-  )
-  .catch(() =>
-    // Try 3: any camera, no constraints
-    tryCamera({ video: { facingMode: 'environment' }, audio: false })
-  )
+  const audioConstraints = {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl:  false,
+  };
+
+  // Try rear cam + mic
+  navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: audioConstraints })
+  .catch(() => {
+    // Try rear cam only (mic blocked)
+    console.warn('[Portal] Mic failed, trying video only');
+    return navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
+  })
+  .catch(() => {
+    // Try any camera + mic
+    return navigator.mediaDevices.getUserMedia({ video: true, audio: audioConstraints });
+  })
+  .catch(() => {
+    // Last resort: any camera, no mic
+    return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  })
+  .then(stream => {
+    S.localStream = stream;
+    S.facingMode  = 'environment'; // we requested rear cam
+
+    const hasVideo = stream.getVideoTracks().length > 0;
+    const hasAudio = stream.getAudioTracks().length > 0;
+
+    console.log('[Portal] Got stream — video:', hasVideo, 'audio:', hasAudio);
+
+    if (!hasVideo) {
+      btn.disabled = false;
+      btn.textContent = 'Allow camera & continue →';
+      showError('Camera not available. Check permissions in Chrome site settings.');
+      return;
+    }
+
+    $('local-video').srcObject = stream;
+    $('cam-label-overlay').textContent = S.label || S.name || 'Rear Camera';
+
+    // Show mic status
+    if (!hasAudio) {
+      document.getElementById('mic-dot').style.background = 'var(--red)';
+      document.getElementById('mic-label').textContent    = 'Mic blocked';
+    }
+
+    show('screen-live');
+    connectWS();
+    CAM.init(stream);
+  })
   .catch(err => {
     btn.textContent = 'Allow camera & continue →';
-    btn.disabled = false;
-    showError('Cannot access camera: ' + err.message + '. Check Chrome site settings for rickom.github.io');
+    btn.disabled    = false;
+    showError('Camera denied: ' + err.message);
   });
 });
 
@@ -716,7 +747,7 @@ function toggleCam(){
 }
 
 async function flipCamera(){
-  S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
+  S.facingMode = S.facingMode==='environment' ? 'user' : 'environment';
   S.localStream.getVideoTracks().forEach(t=>t.stop());
   const newStream = await navigator.mediaDevices.getUserMedia({
     video:{facingMode:S.facingMode},
@@ -730,6 +761,8 @@ async function flipCamera(){
     const sender=pc.getSenders().find(s=>s.track?.kind==='video');
     if(sender) sender.replaceTrack(newTrack);
   });
+  CAM.init(S.localStream);
+  $('cam-label-overlay').textContent = S.facingMode==='environment' ? 'Rear Camera' : 'Front Camera';
 }
 
 // ── CHAT ──────────────────────────────────────────────────────
@@ -750,23 +783,44 @@ const CAM = {
   async init(stream) {
     this.videoTrack = stream.getVideoTracks()[0];
     if (!this.videoTrack) return;
+
+    // Always show camera controls — hide individual sliders if not supported
+    document.getElementById('cam-controls').style.display = 'none'; // hidden until toggled
+    document.getElementById('toggle-cam-controls').style.display = 'block';
+
     const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
     console.log('[CAM] Capabilities:', JSON.stringify(caps));
-    if (caps.zoom || caps.focusMode || caps.exposureCompensation) {
-      document.getElementById('cam-controls').style.display = 'block';
-      document.getElementById('toggle-cam-controls').style.display = 'block';
-      if (caps.zoom) {
-        const s = document.getElementById('zoom-slider');
-        s.min = caps.zoom.min || 1; s.max = caps.zoom.max || 10;
-        s.step = caps.zoom.step || 0.1; s.value = s.min;
-        document.getElementById('zoom-max').textContent = (caps.zoom.max||10) + 'x';
-      }
-      if (caps.exposureCompensation) {
-        const e = document.getElementById('exp-slider');
-        e.min = caps.exposureCompensation.min||-3;
-        e.max = caps.exposureCompensation.max||3;
-        e.step = caps.exposureCompensation.step||0.5;
-      }
+
+    // Zoom
+    if (caps.zoom) {
+      const s = document.getElementById('zoom-slider');
+      s.min   = caps.zoom.min  || 1;
+      s.max   = caps.zoom.max  || 10;
+      s.step  = caps.zoom.step || 0.1;
+      s.value = s.min;
+      document.getElementById('zoom-max').textContent = (caps.zoom.max || 10) + 'x';
+      document.getElementById('zoom-slider').closest('div').style.display = 'block';
+    } else {
+      // Hide zoom if not supported
+      document.getElementById('zoom-slider').closest('div').style.display = 'none';
+    }
+
+    // Exposure
+    if (caps.exposureCompensation) {
+      const e = document.getElementById('exp-slider');
+      e.min   = caps.exposureCompensation.min   || -3;
+      e.max   = caps.exposureCompensation.max   || 3;
+      e.step  = caps.exposureCompensation.step  || 0.5;
+    }
+
+    // Focus
+    if (!caps.focusMode) {
+      document.getElementById('focus-auto-btn').closest('div').closest('div').style.display = 'none';
+    }
+
+    // White balance
+    if (!caps.whiteBalanceMode) {
+      document.getElementById('wb-select').closest('div').style.display = 'none';
     }
   },
 
