@@ -327,6 +327,7 @@ $('allow-btn').addEventListener('click', async () => {
     setupVU();
     show('screen-live');
     connectWS();
+    loadCameras(); // pre-load camera list for flip
   } catch(e){
     show('screen-join');
     showError('Camera/mic denied: ' + e.message);
@@ -484,21 +485,40 @@ function toggleCam(){
 }
 
 // FLIP — exact original working code
+// Store camera list and current index
+S.camList = [];
+S.camIdx  = 0;
+
+async function loadCameras() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  S.camList = devices.filter(d => d.kind === 'videoinput');
+  // Find which index is currently active
+  const currentTrack = S.localStream?.getVideoTracks()[0];
+  const currentId    = currentTrack?.getSettings()?.deviceId;
+  const idx = S.camList.findIndex(d => d.deviceId === currentId);
+  S.camIdx  = idx >= 0 ? idx : 0;
+}
+
 async function flipCamera(){
-  S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
+  if (!S.camList.length) await loadCameras();
+  if (S.camList.length < 2) { chatLog('', 'Only one camera found', true); return; }
+
+  // Move to next camera
+  S.camIdx = (S.camIdx + 1) % S.camList.length;
+  const nextCam = S.camList[S.camIdx];
+
   S.localStream.getVideoTracks().forEach(t=>t.stop());
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode: { ideal: S.facingMode } },
-      audio:false,
+      video: { deviceId: { exact: nextCam.deviceId } },
+      audio: false,
     });
     const newTrack = newStream.getVideoTracks()[0];
-    // Check what camera we actually got
-    const settings = newTrack.getSettings();
-    const gotFacing = settings.facingMode || '';
-    $('local-video').style.transform = gotFacing==='user' ? 'scaleX(-1)' : 'scaleX(1)';
+    const label    = nextCam.label.toLowerCase();
+    const isFront  = label.includes('front') || label.includes('user') || label.includes('selfie');
+    $('local-video').style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
     $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
-    $('cam-label-overlay').textContent = gotFacing==='user' ? '🤳 Front' : '📷 Rear';
+    $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
     S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
     S.localStream.addTrack(newTrack);
     S.peers.forEach(pc=>{
