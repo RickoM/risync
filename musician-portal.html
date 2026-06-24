@@ -591,14 +591,16 @@ async function pickNextCamera() {
 
 async function switchCamera(){
   let oldTrack = null;
+  let currentFacing = S.facingMode || 'user';
+  let audioTracks = S.localStream?.getAudioTracks() || [];
   try {
     const nextCam = await pickNextCamera();
     oldTrack = S.localStream?.getVideoTracks()[0];
     const oldSettings = oldTrack?.getSettings?.() || {};
     const oldDeviceId = oldSettings.deviceId || '';
-    const currentFacing = oldSettings.facingMode || S.facingMode;
+    currentFacing = oldSettings.facingMode || currentFacing;
     const targetFacing = currentFacing === 'user' ? 'environment' : 'user';
-    const audioTracks = S.localStream?.getAudioTracks() || [];
+    audioTracks = S.localStream?.getAudioTracks() || [];
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     // Mobile browsers often cannot open a second camera until the first track is stopped.
