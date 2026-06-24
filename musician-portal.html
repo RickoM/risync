@@ -514,10 +514,10 @@ async function flipCamera(){
   S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
 
-  // Stop track and wait for Android to release camera hardware
-  S.localStream.getVideoTracks().forEach(t=>t.stop());
-  S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
-  await new Promise(r => setTimeout(r, 1000));
+  // Release camera fully before switching
+  $('local-video').srcObject = null;
+  S.localStream.getVideoTracks().forEach(t => { t.stop(); S.localStream.removeTrack(t); });
+  await new Promise(r => setTimeout(r, 1500));
 
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
