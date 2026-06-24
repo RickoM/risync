@@ -323,12 +323,19 @@ $('allow-btn').addEventListener('click', async () => {
     if (camPref === 'front') S.facingMode = 'user';
     const videoConstraint = camId
       ? { deviceId: { exact: camId } }
-      : { facingMode: { ideal: S.facingMode }, width:{ideal:1280}, height:{ideal:720} };
+      : { facingMode: { ideal: S.facingMode } };
 
-    S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraint,
-      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
-    });
+    try {
+      S.localStream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraint,
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch(firstCameraError) {
+      S.localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+      });
+    }
     // Set label from URL if flipped
     const camFront = urlParams.get('camfront');
     if (camFront !== null) {
@@ -588,6 +595,39 @@ function hardReloadForCamera(facing) {
   window.location.href = url.toString();
 }
 
+function testCameraStream(stream) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const timer = setTimeout(() => {
+      video.srcObject = null;
+      reject(new Error('Camera opened but produced no video'));
+    }, 3000);
+
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    video.onloadedmetadata = async () => {
+      try {
+        await video.play();
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          clearTimeout(timer);
+          video.srcObject = null;
+          resolve();
+        }
+      } catch(e) {
+        clearTimeout(timer);
+        video.srcObject = null;
+        reject(e);
+      }
+    };
+    video.onerror = () => {
+      clearTimeout(timer);
+      video.srcObject = null;
+      reject(new Error('Camera test video failed'));
+    };
+  });
+}
+
 async function pickNextCamera() {
   await loadCameras();
   if (S.camList.length < 2) return null;
@@ -617,48 +657,41 @@ async function pickNextCamera() {
 }
 
 async function switchCamera(){
-  let oldTrack = null;
-  let currentFacing = S.facingMode || 'user';
-  let audioTracks = S.localStream?.getAudioTracks() || [];
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const currentFacing = S.facingMode || S.localStream?.getVideoTracks()[0]?.getSettings?.().facingMode || 'user';
+  const nextFacing = currentFacing === 'user' ? 'environment' : 'user';
+  const audioTracks = S.localStream?.getAudioTracks() || [];
+  const oldVideoTracks = S.localStream?.getVideoTracks() || [];
+
   try {
-    const nextCam = await pickNextCamera();
-    oldTrack = S.localStream?.getVideoTracks()[0];
-    const oldSettings = oldTrack?.getSettings?.() || {};
-    currentFacing = oldSettings.facingMode || currentFacing;
-    const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
-    audioTracks = S.localStream?.getAudioTracks() || [];
-    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    oldVideoTracks.forEach(track => {
+      try { S.localStream.removeTrack(track); } catch(e) {}
+      track.stop();
+    });
+    $('local-video').srcObject = null;
+    await sleep(1000);
 
-    // Mobile browsers often cannot open a second camera until the first track is stopped.
-    if (oldTrack) {
-      S.localStream.removeTrack(oldTrack);
-      oldTrack.stop();
-      await sleep(350);
+    let newStream;
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: nextFacing } },
+        audio: false,
+      });
+    } catch(exactError) {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: nextFacing } },
+        audio: false,
+      });
     }
 
-    const attempts = [
-      { label:'ideal '+fallbackFacing, video:{ facingMode: { ideal: fallbackFacing } } },
-      { label:'plain '+fallbackFacing, video:{ facingMode: fallbackFacing } },
-      nextCam ? { label:'selected device', video:{ deviceId: { exact: nextCam.deviceId } } } : null,
-      fallbackFacing === 'environment' ? { label:'exact environment', video:{ facingMode: { exact: 'environment' } } } : null,
-    ].filter(Boolean);
-
-    let newStream = null;
-    let lastError = null;
-    let usedAttempt = '';
-    for (const attempt of attempts) {
-      try {
-        newStream = await navigator.mediaDevices.getUserMedia({ video: attempt.video, audio:false });
-        usedAttempt = attempt.label;
-        break;
-      } catch(err) {
-        lastError = err;
-        await sleep(200);
-      }
-    }
-    if (!newStream) throw lastError || new Error('Camera unavailable');
     const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) throw new Error('No video track returned');
+    try {
+      await testCameraStream(newStream);
+    } catch(testError) {
+      newStream.getTracks().forEach(track => track.stop());
+      throw testError;
+    }
 
     await Promise.all([...S.peers.values()].map(pc => {
       const sender = pc.getSenders().find(s => s.track?.kind === 'video');
@@ -671,14 +704,10 @@ async function switchCamera(){
     await $('local-video').play().catch(()=>{});
 
     const settings = newTrack.getSettings?.() || {};
-    S.facingMode = settings.facingMode || fallbackFacing;
+    S.facingMode = settings.facingMode || nextFacing;
     await loadCameras();
-    chatLog('', `Camera switched (${usedAttempt})`, true);
+    chatLog('', `Camera switched to ${S.facingMode}`, true);
   } catch(e) {
-    const targetFacing = currentFacing === 'user' ? 'environment' : 'user';
-    chatLog('', 'Live switch failed, reloading camera...', true);
-    setTimeout(() => hardReloadForCamera(targetFacing), 350);
-    return;
     try {
       const restoreFacing = currentFacing || 'user';
       const restore = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:restoreFacing } }, audio:false });
