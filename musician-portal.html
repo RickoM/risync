@@ -318,16 +318,21 @@ async function handleOffer(fromPeerId, sdp) {
 $('flip-btn').addEventListener('click', async () => {
   const newFacing = facingMode === 'user' ? 'environment' : 'user';
   try {
+    // Stop old video track FIRST before requesting new camera
+    localStream.getVideoTracks().forEach(t => t.stop());
+    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
+
+    // Now request new camera
     const newStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: newFacing }, audio: false
     });
     const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) return;
+
+    localStream.addTrack(newTrack);
     const vid = $('live-video');
     vid.srcObject = new MediaStream([newTrack, ...localStream.getAudioTracks()]);
-    localStream.getVideoTracks().forEach(t => t.stop());
-    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
-    localStream.addTrack(newTrack);
+    vid.play().catch(() => {});
     facingMode = newFacing;
     $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
     vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
