@@ -318,7 +318,7 @@ $('allow-btn').addEventListener('click', async () => {
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
     $('local-video').srcObject = S.localStream;
-    $('local-video').style.transform = 'scaleX(-1)'; // mirror front cam by default
+    // no mirror
     $('cam-label-overlay').textContent = S.label || S.name;
     $('cam-dot').className = 'pill-dot green';
     $('cam-label').textContent = 'Cam live';
@@ -523,7 +523,7 @@ async function flipCamera(){
     const newTrack = newStream.getVideoTracks()[0];
     const label    = nextCam.label.toLowerCase();
     const isFront  = label.includes('front') || label.includes('user') || label.includes('selfie');
-    $('local-video').style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
+    // no mirror
     $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
     $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
     S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
