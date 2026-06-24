@@ -317,17 +317,20 @@ $('join-btn').addEventListener('click', () => {
 // ALLOW CAM + MIC — exact same as original working version
 $('allow-btn').addEventListener('click', async () => {
   try {
-    const camId = new URLSearchParams(window.location.search).get('camid');
+    const camId = urlParams.get('camid');
+    const camPref = urlParams.get('cam');
+    if (camPref === 'back') S.facingMode = 'environment';
+    if (camPref === 'front') S.facingMode = 'user';
     const videoConstraint = camId
       ? { deviceId: { exact: camId } }
-      : { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} };
+      : { facingMode: { ideal: S.facingMode }, width:{ideal:1280}, height:{ideal:720} };
 
     S.localStream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraint,
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
     // Set label from URL if flipped
-    const camFront = new URLSearchParams(window.location.search).get('camfront');
+    const camFront = urlParams.get('camfront');
     if (camFront !== null) {
       S.facingMode = camFront === '1' ? 'user' : 'environment';
     }
@@ -354,6 +357,13 @@ $('allow-btn').addEventListener('click', async () => {
     showError('Camera/mic denied: ' + e.message);
   }
 });
+
+if (urlParams.get('autojoin') === '1' && urlRoom) {
+  setTimeout(() => {
+    $('join-btn').click();
+    setTimeout(() => $('allow-btn').click(), 250);
+  }, 250);
+}
 
 // WEBSOCKET
 function connectWS(){
@@ -561,6 +571,23 @@ function isBackCamera(device) {
   return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('world');
 }
 
+function hardReloadForCamera(facing) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('room', S.roomId || $('room-code').value.trim().toUpperCase());
+  url.searchParams.set('name', S.name || $('join-name').value.trim() || 'Musician');
+  url.searchParams.set('role', S.role || $('join-role').value);
+  url.searchParams.set('label', S.label || $('join-label').value.trim() || S.name || 'Musician');
+  url.searchParams.set('cam', facing === 'environment' ? 'back' : 'front');
+  url.searchParams.set('autojoin', '1');
+  url.searchParams.delete('camid');
+  url.searchParams.delete('camfront');
+
+  S.peers.forEach(pc => pc.close());
+  S.ws?.close();
+  S.localStream?.getTracks().forEach(t => t.stop());
+  window.location.href = url.toString();
+}
+
 async function pickNextCamera() {
   await loadCameras();
   if (S.camList.length < 2) return null;
@@ -648,6 +675,10 @@ async function switchCamera(){
     await loadCameras();
     chatLog('', `Camera switched (${usedAttempt})`, true);
   } catch(e) {
+    const targetFacing = currentFacing === 'user' ? 'environment' : 'user';
+    chatLog('', 'Live switch failed, reloading camera...', true);
+    setTimeout(() => hardReloadForCamera(targetFacing), 350);
+    return;
     try {
       const restoreFacing = currentFacing || 'user';
       const restore = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:restoreFacing } }, audio:false });
