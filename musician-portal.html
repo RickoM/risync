@@ -313,10 +313,20 @@ $('join-btn').addEventListener('click', () => {
 // ALLOW CAM + MIC — exact same as original working version
 $('allow-btn').addEventListener('click', async () => {
   try {
+    const camId = new URLSearchParams(window.location.search).get('camid');
+    const videoConstraint = camId
+      ? { deviceId: { exact: camId } }
+      : { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} };
+
     S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} },
+      video: videoConstraint,
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
     });
+    // Set label from URL if flipped
+    const camFront = new URLSearchParams(window.location.search).get('camfront');
+    if (camFront !== null) {
+      S.facingMode = camFront === '1' ? 'user' : 'environment';
+    }
     $('local-video').srcObject = S.localStream;
     // no mirror
     $('cam-label-overlay').textContent = S.label || S.name;
@@ -510,39 +520,27 @@ async function flipCamera(){
   if (!S.camList.length) await loadCameras();
   if (S.camList.length < 2) { chatLog('', 'Only one camera found', true); return; }
 
-  // Toggle between index 0 (front) and index 1 (first rear)
   S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
+  const label   = nextCam.label.toLowerCase();
+  const isFront = label.includes('front') || label.includes('forward') || label.includes('user') || label.includes('selfie');
 
-  // Release sender first so Chrome frees the camera
-  S.peers.forEach(pc => {
-    pc.getSenders().filter(s => s.track?.kind === 'video').forEach(s => s.replaceTrack(null));
-  });
-  $('local-video').srcObject = null;
-  S.localStream.getVideoTracks().forEach(t => { t.stop(); S.localStream.removeTrack(t); });
-  await new Promise(r => setTimeout(r, 1000));
+  // Chrome bug: cannot open new camera while peer connection holds old one
+  // Fix: reload page with new deviceId — Chrome starts fresh with no camera lock
+  const url = new URL(window.location.href);
+  url.searchParams.set('room',  S.roomId);
+  url.searchParams.set('name',  S.name);
+  url.searchParams.set('role',  S.role);
+  url.searchParams.set('label', S.label);
+  url.searchParams.set('camid', nextCam.deviceId);
+  url.searchParams.set('camfront', isFront ? '1' : '0');
 
-  try {
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: nextCam.deviceId } },
-      audio: false,
-    });
-    const newTrack = newStream.getVideoTracks()[0];
-    chatLog('', 'Got track: ' + newTrack.label + ' enabled:' + newTrack.enabled + ' state:' + newTrack.readyState, true);
-    const label    = nextCam.label.toLowerCase();
-    const isFront  = label.includes('front') || label.includes('forward') || label.includes('user') || label.includes('selfie');
-    const newSrc = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
-    $('local-video').srcObject = newSrc;
-    $('local-video').play().catch(e => chatLog('', 'play error: '+e.message, true));
-    $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
-    S.localStream.addTrack(newTrack);
-    S.peers.forEach(pc=>{
-      const sender=pc.getSenders().find(s=>s.track?.kind==='video');
-      if(sender) sender.replaceTrack(newTrack);
-    });
-  } catch(e) {
-    chatLog('', 'Flip error: ' + e.message, true);
-  }
+  // Clean up before reload
+  S.peers.forEach(pc => pc.close());
+  S.ws?.close();
+  S.localStream?.getTracks().forEach(t => t.stop());
+
+  window.location.href = url.toString();
 }
 
 // CHAT
