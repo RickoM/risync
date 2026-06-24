@@ -111,15 +111,8 @@ input:focus, select:focus { border-color: #F0A030; }
     <button class="ctrl" id="mute-btn">🎤 Mic on</button>
     <button class="ctrl" id="cam-btn">📷 Cam on</button>
   </div>
-  <div style="font-size:.7rem;color:#5A6490;margin-bottom:10px;padding:8px 10px;background:#171B2A;border-radius:8px;border:1px solid #252B42">
-    🎧 <strong style="color:#8D99C0">Headphones recommended</strong> — prevents echo when monitoring mic
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#171B2A;border-radius:8px;border:1px solid #252B42">
-    <span style="font-size:.8rem">Monitor mic (hear yourself)</span>
-    <button class="ctrl" id="monitor-btn" style="width:auto;padding:6px 14px;font-size:.75rem">Off</button>
-  </div>
 
-  <audio id="monitor-audio" autoplay></audio>
+
   <div class="chat-box" id="chat-box"></div>
   <div class="chat-row">
     <input type="text" id="chat-input" placeholder="Message...">
@@ -339,25 +332,6 @@ $('flip-btn').addEventListener('click', async () => {
     $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
     vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
   } catch(e) { log('Flip failed: ' + e.message, true); }
-});
-
-// MONITOR (hear yourself through earphones)
-let monitoring = false;
-$('monitor-btn').addEventListener('click', () => {
-  monitoring = !monitoring;
-  const audio = $('monitor-audio');
-  if (monitoring && localStream) {
-    // Play mic through phone speaker/earphone
-    audio.srcObject = new MediaStream(localStream.getAudioTracks());
-    audio.play().catch(() => {});
-    $('monitor-btn').textContent = 'On';
-    $('monitor-btn').className   = 'ctrl muted';
-    log('Mic monitoring ON — use headphones to avoid echo', true);
-  } else {
-    audio.srcObject = null;
-    $('monitor-btn').textContent = 'Off';
-    $('monitor-btn').className   = 'ctrl';
-  }
 });
 
 // MUTE / CAM OFF
