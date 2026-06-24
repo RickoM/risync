@@ -1984,6 +1984,20 @@ const REC = {
     const status = $(`phone-status-${peerId}`);
     if (status) status.className = 'cam-tile-status live';
 
+    // Add audio enable button to tile
+    const existingBtn = $(`audio-btn-${peerId}`);
+    if (!existingBtn) {
+      const audioBtn = document.createElement('button');
+      audioBtn.id = `audio-btn-${peerId}`;
+      audioBtn.textContent = '🔊 Enable audio';
+      audioBtn.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:3;background:var(--amber);color:var(--ink);border:none;border-radius:6px;padding:4px 8px;font-size:.65rem;cursor:pointer;font-family:var(--fm)';
+      audioBtn.onclick = () => {
+        const v = $(`phone-vid-${peerId}`);
+        if (v) { v.muted = false; v.play(); audioBtn.remove(); toast('Audio enabled'); }
+      };
+      tile.appendChild(audioBtn);
+    }
+
     // Create video element
     let vid = $(`phone-vid-${peerId}`);
     if (!vid) {
@@ -1999,14 +2013,26 @@ const REC = {
 
     // Attach stream and force play
     vid.srcObject = stream;
+
+    // Unlock audio context first (required by browser autoplay policy)
+    const unlockAudio = () => {
+      vid.play().then(() => {
+        console.log('[RISYNC] Phone video+audio playing');
+        toast('📱 Phone camera live — audio active');
+      }).catch(e => {
+        console.warn('[RISYNC] Play failed:', e.message);
+      });
+      document.removeEventListener('click', unlockAudio);
+    };
+
+    // Try immediately
     vid.play().then(() => {
-      console.log('[RISYNC] Phone video playing successfully');
+      console.log('[RISYNC] Phone video playing — audio:', !vid.muted);
       toast('📱 Phone camera live!');
-    }).catch(e => {
-      console.warn('[RISYNC] Video play failed:', e.message);
-      // Try again on user interaction
-      tile.addEventListener('click', () => vid.play(), { once: true });
-      toast('Tap the phone tile to start video');
+    }).catch(() => {
+      // Blocked by autoplay — unlock on next user click
+      toast('📱 Phone connected — click anywhere to enable audio');
+      document.addEventListener('click', unlockAudio, { once: true });
     });
   },
 
