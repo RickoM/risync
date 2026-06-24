@@ -487,19 +487,27 @@ function toggleCam(){
 async function flipCamera(){
   S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
   S.localStream.getVideoTracks().forEach(t=>t.stop());
-  const newStream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:S.facingMode},
-    audio:false,
-  });
-  const newTrack = newStream.getVideoTracks()[0];
-  $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
-  $('local-video').style.transform = S.facingMode==='user' ? 'scaleX(-1)' : 'scaleX(1)';
-  S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
-  S.localStream.addTrack(newTrack);
-  S.peers.forEach(pc=>{
-    const sender=pc.getSenders().find(s=>s.track?.kind==='video');
-    if(sender) sender.replaceTrack(newTrack);
-  });
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: { ideal: S.facingMode } },
+      audio:false,
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+    // Check what camera we actually got
+    const settings = newTrack.getSettings();
+    const gotFacing = settings.facingMode || '';
+    $('local-video').style.transform = gotFacing==='user' ? 'scaleX(-1)' : 'scaleX(1)';
+    $('local-video').srcObject = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
+    $('cam-label-overlay').textContent = gotFacing==='user' ? '🤳 Front' : '📷 Rear';
+    S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
+    S.localStream.addTrack(newTrack);
+    S.peers.forEach(pc=>{
+      const sender=pc.getSenders().find(s=>s.track?.kind==='video');
+      if(sender) sender.replaceTrack(newTrack);
+    });
+  } catch(e) {
+    chatLog('', 'Flip error: ' + e.message, true);
+  }
 }
 
 // CHAT
