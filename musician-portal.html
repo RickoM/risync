@@ -465,59 +465,74 @@ $('allow-btn').addEventListener('click', () => {
   const btn = $('allow-btn');
   btn.textContent = 'Starting camera...';
   btn.disabled = true;
+  btn.textContent = 'Starting...';
 
-  // Request rear camera + mic together
-  const videoConstraints = {
-    facingMode: 'user',
-    width:  { ideal: 1280 },
-    height: { ideal: 720 },
-  };
+  // Step 1: try video + mic
+  // Step 2: try video only (mic denied)  
+  // Step 3: try any video
+  async function startCamera() {
+    let stream = null;
+    let hasMic = false;
 
-  const audioConstraints = {
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl:  false,
-  };
+    // Try with mic first
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
+        audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+      });
+      hasMic = true;
+      console.log('[Portal] Got video + audio');
+    } catch(e) {
+      console.log('[Portal] Mic failed:', e.message, '— trying video only');
+    }
 
-  // Try rear cam + mic
-  navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: audioConstraints })
-  .catch(() => {
-    // Try rear cam only (mic blocked)
-    console.warn('[Portal] Mic failed, trying video only');
-    return navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
-  })
-  .catch(() => {
-    // Try any camera + mic
-    return navigator.mediaDevices.getUserMedia({ video: true, audio: audioConstraints });
-  })
-  .catch(() => {
-    // Last resort: any camera, no mic
-    return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-  })
-  .then(stream => {
+    // Try video only if mic failed
+    if (!stream) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
+          audio: false
+        });
+        console.log('[Portal] Got video only');
+      } catch(e) {
+        console.log('[Portal] facingMode failed:', e.message, '— trying plain video');
+      }
+    }
+
+    // Last resort
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      console.log('[Portal] Got plain video');
+    }
+
+    return { stream, hasMic };
+  }
+
+  startCamera()
+  .then(({ stream, hasMic }) => {
+    // Store stream globally
     S.localStream = stream;
+    S.facingMode  = 'user';
 
-    const hasVideo = stream.getVideoTracks().length > 0;
-    const hasAudio = stream.getAudioTracks().length > 0;
+    console.log('[Portal] Stream ready. Video tracks:', stream.getVideoTracks().length, 'Audio tracks:', stream.getAudioTracks().length);
 
-    console.log('[Portal] Got stream — video:', hasVideo, 'audio:', hasAudio);
+    // Show video
+    const vid = $('local-video');
+    vid.srcObject = stream;
+    vid.play().catch(()=>{});
 
-    if (!hasVideo) {
-      btn.disabled = false;
-      btn.textContent = 'Allow camera & continue →';
-      showError('Camera not available. Check permissions in Chrome site settings.');
-      return;
+    // Update mic status indicator
+    const micDot   = document.getElementById('mic-dot');
+    const micLabel = document.getElementById('mic-label');
+    if (hasMic && stream.getAudioTracks().length > 0) {
+      if(micDot)   micDot.style.background = 'var(--green)';
+      if(micLabel) micLabel.textContent    = 'Mic live';
+    } else {
+      if(micDot)   micDot.style.background = 'var(--red)';
+      if(micLabel) micLabel.textContent    = 'Mic off';
     }
 
-    $('local-video').srcObject = stream;
-    $('cam-label-overlay').textContent = S.label || S.name || 'Rear Camera';
-
-    // Show mic status
-    if (!hasAudio) {
-      document.getElementById('mic-dot').style.background = 'var(--red)';
-      document.getElementById('mic-label').textContent    = 'Mic blocked';
-    }
-
+    $('cam-label-overlay').textContent = '🤳 Front Camera';
     show('screen-live');
     connectWS();
     CAM.init(stream);
@@ -525,7 +540,7 @@ $('allow-btn').addEventListener('click', () => {
   .catch(err => {
     btn.textContent = 'Allow camera & continue →';
     btn.disabled    = false;
-    showError('Camera denied: ' + err.message);
+    showError('Camera access failed: ' + err.message + '. Go to Chrome Settings → Site Settings → Camera → Allow rickom.github.io');
   });
 });
 
@@ -711,7 +726,10 @@ function setupVU(){
 // ── CONTROLS ──────────────────────────────────────────────────
 $('mute-btn').addEventListener('click', toggleMic);
 $('cam-btn').addEventListener('click', toggleCam);
-$('flip-btn').addEventListener('click', flipCamera);
+$('flip-btn').addEventListener('click', () => {
+  console.log('[Flip] Button tapped, facingMode:', S.facingMode, 'stream:', !!S.localStream);
+  flipCamera();
+});
 
 function toggleMic(){
   S.micMuted=!S.micMuted;
@@ -730,33 +748,46 @@ function toggleCam(){
 }
 
 async function flipCamera(){
+  if (!S.localStream) { console.warn('[Flip] No stream'); return; }
+
   const newFacing = S.facingMode === 'user' ? 'environment' : 'user';
-  const vid = $('local-video');
+  console.log('[Flip] Switching from', S.facingMode, 'to', newFacing);
 
-  // Get new camera stream — keep old one running until new is ready
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing }, audio: false })
-  .then(newStream => {
+  try {
+    // Get new video stream — keep old running
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: newFacing },
+      audio: false
+    });
+
     const newTrack = newStream.getVideoTracks()[0];
-    if (!newTrack) return;
+    if (!newTrack) { console.warn('[Flip] No track in new stream'); return; }
 
-    // Build new stream keeping existing audio
-    const combined = new MediaStream([newTrack, ...S.localStream.getAudioTracks()]);
-    
-    // Swap video element source
+    console.log('[Flip] New track:', newTrack.label);
+
+    // Keep existing audio, swap video
+    const audioTracks = S.localStream.getAudioTracks();
+    const combined    = new MediaStream([newTrack, ...audioTracks]);
+
+    // Update video preview
+    const vid = $('local-video');
     vid.srcObject = combined;
-    vid.play();
+    vid.play().catch(()=>{});
 
-    // Stop old video tracks only after new is playing
-    vid.onplaying = () => {
-      S.localStream.getVideoTracks().forEach(t => t.stop());
-      S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
-      S.localStream.addTrack(newTrack);
-      S.facingMode = newFacing;
-      $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear' : '🤳 Front';
-      vid.onplaying = null;
-    };
-  })
-  .catch(e => console.error('[Flip]', e.message));
+    // Stop old video AFTER new is set
+    S.localStream.getVideoTracks().forEach(t => t.stop());
+
+    // Rebuild localStream
+    const newLocalStream = new MediaStream([newTrack, ...audioTracks]);
+    S.localStream = newLocalStream;
+    S.facingMode  = newFacing;
+
+    $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear Cam' : '🤳 Front Cam';
+    console.log('[Flip] Done — now on', newFacing);
+
+  } catch(e) {
+    console.error('[Flip] Error:', e.message);
+  }
 }
 
 // ── CHAT ──────────────────────────────────────────────────────
