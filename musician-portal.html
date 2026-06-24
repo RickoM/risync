@@ -590,29 +590,40 @@ async function pickNextCamera() {
 }
 
 async function switchCamera(){
+  let oldTrack = null;
   try {
     const nextCam = await pickNextCamera();
-    const currentTrack = S.localStream?.getVideoTracks()[0];
-    const currentFacing = currentTrack?.getSettings?.().facingMode || S.facingMode;
+    oldTrack = S.localStream?.getVideoTracks()[0];
+    const currentFacing = oldTrack?.getSettings?.().facingMode || S.facingMode;
     const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
-    const video = nextCam
-      ? { deviceId: { exact: nextCam.deviceId }, width:{ideal:1280}, height:{ideal:720} }
-      : { facingMode: { ideal: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} };
 
-    const newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+    // Mobile browsers often cannot open a second camera until the first track is stopped.
+    if (oldTrack) {
+      S.localStream.removeTrack(oldTrack);
+      oldTrack.stop();
+    }
+
+    let newStream;
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} },
+        audio: false,
+      });
+    } catch(exactFacingError) {
+      const video = nextCam
+        ? { deviceId: { exact: nextCam.deviceId }, width:{ideal:1280}, height:{ideal:720} }
+        : { facingMode: { ideal: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} };
+      newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+    }
+
     const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) throw new Error('No video track returned');
 
-    S.peers.forEach(pc => {
+    await Promise.all([...S.peers.values()].map(pc => {
       const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) sender.replaceTrack(newTrack);
-    });
+      return sender ? sender.replaceTrack(newTrack) : Promise.resolve();
+    }));
 
-    currentTrack?.stop();
-    S.localStream.getVideoTracks().forEach(track => {
-      if (track !== currentTrack) track.stop();
-      S.localStream.removeTrack(track);
-    });
     S.localStream.addTrack(newTrack);
     newTrack.enabled = !S.camOff;
     $('local-video').srcObject = S.localStream;
