@@ -1855,14 +1855,17 @@ const REC = {
 
       case 'peer-joined':
         console.log('[RISYNC] Phone joined:', msg.peerId, msg.name);
+        console.log('[RISYNC] Studio peerId:', this.studioPeerId);
+        console.log('[RISYNC] Room:', this._pendingRoomCode);
         toast(`${msg.name || 'Phone'} connected — establishing video...`);
-        // Close QR modal now phone has joined
         $('qr-modal').classList.remove('open');
         this.addPhoneCamera(msg.peerId, msg.name || 'Phone');
-        // Small delay then initiate WebRTC offer
+        // Delay then send WebRTC offer to phone
         setTimeout(async () => {
+          console.log('[RISYNC] Creating peer connection and sending offer to:', msg.peerId);
           await this.createPhonePeerConn(msg.peerId, true);
-        }, 500);
+          console.log('[RISYNC] Offer sent');
+        }, 1000);
         break;
 
       case 'peer-left':
@@ -1875,12 +1878,22 @@ const REC = {
         break;
 
       case 'answer':
-        await this.phonePeers.get(msg.fromPeerId)?.setRemoteDescription({type:'answer', sdp:msg.sdp});
+        console.log('[RISYNC] Got answer from phone:', msg.fromPeerId);
+        const pc = this.phonePeers.get(msg.fromPeerId);
+        if (pc) {
+          await pc.setRemoteDescription({type:'answer', sdp:msg.sdp});
+          console.log('[RISYNC] Remote description set — waiting for ICE...');
+        } else {
+          console.warn('[RISYNC] No peer connection found for:', msg.fromPeerId);
+        }
         break;
 
       case 'ice-candidate':
         if (msg.candidate) {
-          await this.phonePeers.get(msg.fromPeerId)?.addIceCandidate(new RTCIceCandidate(msg.candidate));
+          const pcIce = this.phonePeers.get(msg.fromPeerId);
+          if (pcIce) {
+            await pcIce.addIceCandidate(new RTCIceCandidate(msg.candidate));
+          }
         }
         break;
 
@@ -1913,9 +1926,13 @@ const REC = {
     };
 
     pc.ontrack = e => {
-      console.log('[RISYNC] Got track from phone:', e.track.kind);
-      if (e.track.kind === 'video') {
+      console.log('[RISYNC] Got track from phone:', e.track.kind, 'streams:', e.streams.length);
+      if (e.streams && e.streams[0]) {
         this.attachPhoneVideo(peerId, e.streams[0]);
+      } else if (e.track.kind === 'video') {
+        // No stream object — create one from the track directly
+        const stream = new MediaStream([e.track]);
+        this.attachPhoneVideo(peerId, stream);
       }
     };
 
