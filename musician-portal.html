@@ -514,10 +514,13 @@ async function flipCamera(){
   S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
 
-  // Release camera fully before switching
+  // Release sender first so Chrome frees the camera
+  S.peers.forEach(pc => {
+    pc.getSenders().filter(s => s.track?.kind === 'video').forEach(s => s.replaceTrack(null));
+  });
   $('local-video').srcObject = null;
   S.localStream.getVideoTracks().forEach(t => { t.stop(); S.localStream.removeTrack(t); });
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 1000));
 
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
