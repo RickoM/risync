@@ -747,48 +747,32 @@ function toggleCam(){
 
 async function flipCamera(){
   try {
-    S.facingMode = S.facingMode==='user' ? 'environment' : 'user';
+    const newFacing = S.facingMode === 'user' ? 'environment' : 'user';
 
-    // Get new stream BEFORE stopping old one
+    // Get new stream first — don't stop old one yet
     const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facingMode },
+      video: { facingMode: newFacing },
       audio: false,
     });
 
     const newTrack = newStream.getVideoTracks()[0];
 
-    // Update local preview only — don't touch peer connections yet
-    const audioTracks = S.localStream.getAudioTracks();
-    $('local-video').srcObject = new MediaStream([newTrack, ...audioTracks]);
+    // Update local preview only — never touch peer connections
+    $('local-video').srcObject = new MediaStream(
+      [newTrack, ...S.localStream.getAudioTracks()]
+    );
 
-    // Stop OLD video tracks after new stream is live
+    // Now stop old video tracks
     S.localStream.getVideoTracks().forEach(t => t.stop());
-
-    // Update localStream reference
     S.localStream.getVideoTracks().forEach(t => S.localStream.removeTrack(t));
     S.localStream.addTrack(newTrack);
 
-    // Replace track in peers WITHOUT stopping the connection
-    // Use a small delay so new track is ready
-    setTimeout(() => {
-      S.peers.forEach(pc => {
-        try {
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender && pc.connectionState !== 'closed') {
-            sender.replaceTrack(newTrack);
-          }
-        } catch(e) {
-          console.warn('[Flip] replaceTrack error:', e.message);
-        }
-      });
-    }, 300);
-
-    $('cam-label-overlay').textContent = S.facingMode === 'environment' ? '📷 Rear' : '🤳 Front';
+    // Update state
+    S.facingMode = newFacing;
+    $('cam-label-overlay').textContent = newFacing === 'environment' ? '📷 Rear' : '🤳 Front';
 
   } catch(e) {
     console.error('[Flip] Error:', e.message);
-    // Revert facingMode on failure
-    S.facingMode = S.facingMode === 'user' ? 'environment' : 'user';
   }
 }
 
