@@ -313,28 +313,13 @@ $('join-btn').addEventListener('click', () => {
 // ALLOW CAM + MIC — exact same as original working version
 $('allow-btn').addEventListener('click', async () => {
   try {
-    // Get mic first
-    let audioStream = null;
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-    } catch(e) {}
-
-    // Get video — try rear first, fallback to any
-    let videoStream = null;
-    try {
-      videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-    } catch(e) {
-      videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    }
-
-    // Combine
-    const tracks = [...videoStream.getVideoTracks()];
-    if (audioStream) audioStream.getAudioTracks().forEach(t => tracks.push(t));
-    S.localStream = new MediaStream(tracks);
-    S.facingMode = 'environment';
+    S.localStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: S.facingMode, width:{ideal:1280}, height:{ideal:720} },
+      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+    });
     $('local-video').srcObject = S.localStream;
     // no mirror
-    $('cam-label-overlay').textContent = '📷 Rear';
+    $('cam-label-overlay').textContent = S.label || S.name;
     $('cam-dot').className = 'pill-dot green';
     $('cam-label').textContent = 'Cam live';
     $('mic-dot').className = 'pill-dot green';
@@ -529,7 +514,11 @@ async function flipCamera(){
   S.camIdx = S.camIdx === 0 ? 1 : 0;
   const nextCam = S.camList[S.camIdx];
 
+  // Stop track and wait for Android to release camera hardware
   S.localStream.getVideoTracks().forEach(t=>t.stop());
+  S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
+  await new Promise(r => setTimeout(r, 1000));
+
   try {
     const newStream = await navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: nextCam.deviceId } },
@@ -543,7 +532,6 @@ async function flipCamera(){
     $('local-video').srcObject = newSrc;
     $('local-video').play().catch(e => chatLog('', 'play error: '+e.message, true));
     $('cam-label-overlay').textContent = isFront ? '🤳 Front' : '📷 Rear';
-    S.localStream.getVideoTracks().forEach(t=>S.localStream.removeTrack(t));
     S.localStream.addTrack(newTrack);
     S.peers.forEach(pc=>{
       const sender=pc.getSenders().find(s=>s.track?.kind==='video');
