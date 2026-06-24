@@ -314,18 +314,60 @@ async function handleOffer(fromPeerId, sdp) {
   send({ type:'answer', sdp:answer.sdp, targetPeerId:fromPeerId });
 }
 
-// FLIP
+// FLIP — enumerate devices to find exact camera IDs
+let videoDevices = [];
+navigator.mediaDevices.enumerateDevices().then(devices => {
+  videoDevices = devices.filter(d => d.kind === 'videoinput');
+  console.log('[Flip] Cameras found:', videoDevices.map(d => d.label));
+});
+
 $('flip-btn').addEventListener('click', async () => {
   const newFacing = facingMode === 'user' ? 'environment' : 'user';
   try {
-    // Stop old video track FIRST before requesting new camera
+    // Stop old video track first
     localStream.getVideoTracks().forEach(t => t.stop());
     localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
 
-    // Now request new camera
-    const newStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: newFacing }, audio: false
-    });
+    let newStream = null;
+
+    // Try by deviceId if we have multiple cameras
+    if (videoDevices.length >= 2) {
+      // Find camera by label hint
+      const frontKeywords = ['front', 'selfie', 'user', 'facing front'];
+      const backKeywords  = ['back', 'rear', 'environment', 'facing back', 'main'];
+      const keywords = newFacing === 'user' ? frontKeywords : backKeywords;
+      let target = videoDevices.find(d => keywords.some(k => d.label.toLowerCase().includes(k)));
+
+      // If no label match, toggle between first and last device
+      if (!target) {
+        const currentIdx = videoDevices.findIndex(d => {
+          const cur = localStream.getVideoTracks()[0];
+          return cur && d.deviceId === cur.getSettings()?.deviceId;
+        });
+        target = videoDevices[currentIdx === 0 ? videoDevices.length - 1 : 0];
+      }
+
+      if (target) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: target.deviceId } },
+            audio: false
+          });
+          console.log('[Flip] Switched to:', target.label);
+        } catch(e) {
+          console.warn('[Flip] deviceId failed:', e.message);
+        }
+      }
+    }
+
+    // Fallback: use facingMode
+    if (!newStream) {
+      newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacing },
+        audio: false
+      });
+    }
+
     const newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) return;
 
@@ -336,7 +378,16 @@ $('flip-btn').addEventListener('click', async () => {
     facingMode = newFacing;
     $('cam-name').textContent = newFacing === 'user' ? '🤳 Front' : '📷 Rear';
     vid.style.transform = newFacing === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
-  } catch(e) { log('Flip failed: ' + e.message, true); }
+
+    // Refresh device list for next flip
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      videoDevices = devices.filter(d => d.kind === 'videoinput');
+    });
+
+  } catch(e) {
+    log('Flip failed: ' + e.message, true);
+    console.error('[Flip]', e);
+  }
 });
 
 // MUTE / CAM OFF
