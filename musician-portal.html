@@ -467,44 +467,42 @@ $('allow-btn').addEventListener('click', () => {
   btn.disabled = true;
   btn.textContent = 'Starting...';
 
-  // Step 1: try video + mic
-  // Step 2: try video only (mic denied)  
-  // Step 3: try any video
   async function startCamera() {
-    let stream = null;
-    let hasMic = false;
+    // Get video and audio SEPARATELY
+    // This way if one fails the other still works
 
-    // Try with mic first
+    // Get video stream
+    let videoStream = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
+      videoStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
+        audio: false
+      });
+    } catch(e) {
+      // Try without constraints
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+
+    // Get mic stream separately
+    let audioStream = null;
+    let hasMic = false;
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
         audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
       });
       hasMic = true;
-      console.log('[Portal] Got video + audio');
+      console.log('[Portal] Mic acquired separately');
     } catch(e) {
-      console.log('[Portal] Mic failed:', e.message, '— trying video only');
+      console.log('[Portal] Mic not available:', e.message);
     }
 
-    // Try video only if mic failed
-    if (!stream) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width:{ideal:1280}, height:{ideal:720} },
-          audio: false
-        });
-        console.log('[Portal] Got video only');
-      } catch(e) {
-        console.log('[Portal] facingMode failed:', e.message, '— trying plain video');
-      }
-    }
+    // Combine into single stream
+    const tracks = [...videoStream.getTracks()];
+    if (audioStream) tracks.push(...audioStream.getTracks());
+    const stream = new MediaStream(tracks);
 
-    // Last resort
-    if (!stream) {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      console.log('[Portal] Got plain video');
-    }
-
+    console.log('[Portal] Combined stream — video:', stream.getVideoTracks().length, 'audio:', stream.getAudioTracks().length);
     return { stream, hasMic };
   }
 
