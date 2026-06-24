@@ -1349,7 +1349,7 @@ const S = {
   risyncVideoFile: null, risyncSections: [],
   risyncContext: null, risyncStyle: 'Cinematic',
   // Backend
-  BACKEND: window.BACKEND_URL || 'http://localhost:3000',
+  BACKEND: 'https://risync-backend.onrender.com',
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -1794,7 +1794,7 @@ const REC = {
   // ── WebRTC signalling ────────────────────────────────────────
   // Uses local test server (ws://LOCAL_IP:3001) or Render in production
   get wsUrl() {
-    return window.RISYNC_WS || S.BACKEND.replace('http','ws').replace('https','wss');
+    return window.RISYNC_WS || 'wss://risync-backend.onrender.com';
   },
 
   get apiBase() {
@@ -1966,11 +1966,8 @@ const REC = {
     this._pendingRoomCode = roomCode;
     this.phonePeers = this.phonePeers || new Map();
 
-    // Build join URL using local server IP if available
-    const host  = window.RISYNC_HOST || window.location.hostname;
-    const port  = window.RISYNC_PORT || '';
-    const portStr = port && port !== 80 && port !== 443 ? ':' + port : '';
-    const joinUrl = `http://${host}${portStr}/musician-portal.html?room=${roomCode}&ws=${encodeURIComponent(this.wsUrl)}`;
+    // Always point to GitHub Pages musician portal (HTTPS)
+    const joinUrl = `https://rickom.github.io/risync/musician-portal.html?room=${roomCode}`;
 
     $('qr-room-code').textContent = roomCode;
     $('qr-url-text').textContent  = joinUrl;
@@ -2768,7 +2765,7 @@ const SESSION = {
   recMode: 'director',
 };
 
-const WS_URL  = (S.BACKEND.replace('http','ws').replace('https','wss'));
+const WS_URL  = ('wss://risync-backend.onrender.com');
 const STUN    = [{ urls:'stun:stun.l.google.com:19302' },{ urls:'stun:stun1.l.google.com:19302' }];
 const PORTAL  = window.location.origin + '/musician-portal.html';
 
