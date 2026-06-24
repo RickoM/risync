@@ -458,7 +458,7 @@ async function handleMessage(msg){
 
     case 'connected':
       S.peerId = msg.peerId;
-      send({ type:'join-room', roomId:S.roomId, name:S.name, role:S.role, label:S.label });
+      send({ type:'join-room', roomId:S.roomId, roomCode:S.roomId, name:S.name, role:S.role, label:S.label });
       break;
 
     case 'room-joined':

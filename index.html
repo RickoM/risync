@@ -1841,14 +1841,16 @@ const REC = {
 
       case 'room-created':
         console.log('[RISYNC] Room ready:', msg.roomCode);
-        // Always use GitHub Pages URL — never use server-provided URL
+        // Room confirmed on server — NOW show the QR code
         const confirmedUrl = 'https://rickom.github.io/risync/musician-portal.html?room=' + msg.roomCode;
-        $('qr-url-text').textContent = confirmedUrl;
-        this.drawQR(msg.roomCode, confirmedUrl);
+        $('qr-room-code').textContent = msg.roomCode;
+        $('qr-url-text').textContent  = confirmedUrl;
+        $('copy-qr-link-btn').style.display = 'inline-flex';
         $('copy-qr-link-btn').onclick = () => {
           navigator.clipboard.writeText(confirmedUrl);
           toast('Link copied!');
         };
+        this.drawQR(msg.roomCode, confirmedUrl);
         break;
 
       case 'peer-joined':
@@ -1969,16 +1971,14 @@ const REC = {
     this._pendingRoomCode = roomCode;
     this.phonePeers = this.phonePeers || new Map();
 
-    // Always point to GitHub Pages musician portal (HTTPS)
-    const joinUrl = `https://rickom.github.io/risync/musician-portal.html?room=${roomCode}`;
-
-    $('qr-room-code').textContent = roomCode;
-    $('qr-url-text').textContent  = joinUrl;
-    $('copy-qr-link-btn').onclick = () => { navigator.clipboard.writeText(joinUrl); toast('Link copied!'); };
-    this.drawQR(roomCode, joinUrl);
+    // Show loading state — QR appears only after server confirms room
+    $('qr-room-code').textContent = 'Creating room...';
+    $('qr-url-text').textContent  = 'Connecting to server...';
+    $('qr-canvas').innerHTML = '<div style="padding:20px;font-family:var(--fm);font-size:.7rem;color:var(--subtle);text-align:center">⟳ Creating room...<br>Please wait</div>';
+    $('copy-qr-link-btn').style.display = 'none';
     $('qr-modal').classList.add('open');
 
-    // Connect to signalling server
+    // Connect to signalling server — QR shown in room-created handler
     this.connectSignalling();
   },
 
