@@ -296,6 +296,82 @@ function checkCamSupport() {
     <button class="flip-btn" id="flip-btn">⟳ Flip</button>
   </div>
 
+  <!-- Camera controls -->
+  <div id="cam-controls" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
+    
+    <!-- Zoom -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Zoom</span>
+        <span style="font-family:var(--fm);font-size:.68rem;color:var(--amber)" id="zoom-val">1×</span>
+      </div>
+      <input type="range" id="zoom-slider" min="1" max="5" step="0.1" value="1"
+        style="width:100%;accent-color:var(--amber)"
+        oninput="CAM.setZoom(this.value)">
+      <div style="display:flex;justify-content:space-between;margin-top:3px">
+        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">1×</span>
+        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)" id="zoom-max">5×</span>
+      </div>
+    </div>
+
+    <!-- Focus -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Focus</span>
+        <div style="display:flex;gap:6px">
+          <button onclick="CAM.setFocus('auto')" id="focus-auto-btn"
+            style="font-family:var(--fm);font-size:.62rem;padding:3px 10px;border-radius:5px;border:1px solid var(--amber);background:var(--amber-glow);color:var(--amber);cursor:pointer">
+            Auto
+          </button>
+          <button onclick="CAM.setFocus('manual')" id="focus-manual-btn"
+            style="font-family:var(--fm);font-size:.62rem;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--subtle);cursor:pointer">
+            Manual
+          </button>
+        </div>
+      </div>
+      <input type="range" id="focus-slider" min="0" max="1" step="0.01" value="0.5"
+        style="width:100%;accent-color:var(--teal);display:none"
+        oninput="CAM.setFocusDistance(this.value)">
+    </div>
+
+    <!-- Exposure -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">Exposure</span>
+        <span style="font-family:var(--fm);font-size:.68rem;color:var(--subtle)" id="exp-val">Auto</span>
+      </div>
+      <input type="range" id="exp-slider" min="-3" max="3" step="0.5" value="0"
+        style="width:100%;accent-color:var(--violet)"
+        oninput="CAM.setExposure(this.value)">
+      <div style="display:flex;justify-content:space-between;margin-top:3px">
+        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">Dark</span>
+        <span style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">Bright</span>
+      </div>
+    </div>
+
+    <!-- White balance -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:var(--fm);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle)">White Balance</span>
+        <span style="font-family:var(--fm);font-size:.68rem;color:var(--subtle)" id="wb-val">Auto</span>
+      </div>
+      <select id="wb-select" onchange="CAM.setWhiteBalance(this.value)"
+        style="width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--bright);font-size:.75rem;padding:6px 10px;outline:none">
+        <option value="auto">Auto</option>
+        <option value="daylight">Daylight</option>
+        <option value="cloudy">Cloudy</option>
+        <option value="fluorescent">Fluorescent</option>
+        <option value="incandescent">Incandescent</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Toggle camera controls -->
+  <button id="toggle-cam-controls" onclick="CAM.toggleControls()"
+    style="width:100%;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--subtle);font-family:var(--fm);font-size:.65rem;cursor:pointer;margin-bottom:12px;display:none">
+    🎛 Camera controls
+  </button>
+
   <!-- Levels -->
   <div class="meter-row">
     <div class="meter-label" style="font-size:.6rem">MIC</div>
@@ -419,6 +495,7 @@ $('allow-btn').addEventListener('click', () => {
         $('cam-label-overlay').textContent = S.label || S.name || 'Camera';
         show('screen-live');
         connectWS();
+        CAM.init(stream); // init camera controls
         if (!stream.getAudioTracks().length) {
           chatLog('', 'Video only — no microphone', true);
         }
@@ -666,7 +743,73 @@ function sendChat(){
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
 
-// ── LEAVE ─────────────────────────────────────────────────────
+// ── CAMERA CONTROLS (MediaStream Image Capture API) ──────────
+const CAM = {
+  videoTrack: null,
+
+  async init(stream) {
+    this.videoTrack = stream.getVideoTracks()[0];
+    if (!this.videoTrack) return;
+    const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+    console.log('[CAM] Capabilities:', JSON.stringify(caps));
+    if (caps.zoom || caps.focusMode || caps.exposureCompensation) {
+      document.getElementById('cam-controls').style.display = 'block';
+      document.getElementById('toggle-cam-controls').style.display = 'block';
+      if (caps.zoom) {
+        const s = document.getElementById('zoom-slider');
+        s.min = caps.zoom.min || 1; s.max = caps.zoom.max || 10;
+        s.step = caps.zoom.step || 0.1; s.value = s.min;
+        document.getElementById('zoom-max').textContent = (caps.zoom.max||10) + 'x';
+      }
+      if (caps.exposureCompensation) {
+        const e = document.getElementById('exp-slider');
+        e.min = caps.exposureCompensation.min||-3;
+        e.max = caps.exposureCompensation.max||3;
+        e.step = caps.exposureCompensation.step||0.5;
+      }
+    }
+  },
+
+  async apply(c) {
+    if (!this.videoTrack) return;
+    try { await this.videoTrack.applyConstraints({ advanced: [c] }); }
+    catch(e) { console.warn('[CAM]', e.message); }
+  },
+
+  async setZoom(v) {
+    document.getElementById('zoom-val').textContent = parseFloat(v).toFixed(1) + 'x';
+    await this.apply({ zoom: parseFloat(v) });
+  },
+
+  async setFocus(mode) {
+    const isAuto = mode === 'auto';
+    document.getElementById('focus-slider').style.display = isAuto ? 'none' : 'block';
+    await this.apply({ focusMode: isAuto ? 'continuous' : 'manual' });
+  },
+
+  async setFocusDistance(v) { await this.apply({ focusDistance: parseFloat(v) }); },
+
+  async setExposure(v) {
+    const n = parseFloat(v);
+    document.getElementById('exp-val').textContent = n===0 ? 'Auto' : (n>0?'+':'')+n+' EV';
+    await this.apply({ exposureCompensation: n });
+  },
+
+  async setWhiteBalance(mode) {
+    const temps = {daylight:5500,cloudy:6500,fluorescent:4000,incandescent:2700};
+    document.getElementById('wb-val').textContent = mode.charAt(0).toUpperCase()+mode.slice(1);
+    await this.apply(mode==='auto' ? {whiteBalanceMode:'continuous'} : {whiteBalanceMode:'manual',colorTemperature:temps[mode]||5500});
+  },
+
+  toggleControls() {
+    const p = document.getElementById('cam-controls');
+    const b = document.getElementById('toggle-cam-controls');
+    const open = p.style.display === 'block';
+    p.style.display = open ? 'none' : 'block';
+    b.textContent = open ? '🎛 Camera controls' : '✕ Close controls';
+  },
+};
+
 $('leave-btn').addEventListener('click', ()=>{
   S.localStream?.getTracks().forEach(t=>t.stop());
   S.ws?.close();
