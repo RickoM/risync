@@ -883,7 +883,13 @@ $('leave-btn').addEventListener('click', ()=>{
 });
 
 // ── AUTO JOIN FROM URL PARAM ──────────────────────────────────
-if (urlRoom) { $('room-code').value = urlRoom.toUpperCase(); $('preview-btn').click(); }
+// Just fill the room code — don't auto-preview (room may not exist yet)
+if (urlRoom) {
+  $('room-code').value = urlRoom.toUpperCase();
+  // Show a helpful message
+  clearError();
+  document.getElementById('session-preview').style.display = 'none';
+}
 </script>
 </body>
 </html>
