@@ -1,0 +1,3041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISYNC Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:        #080B12;
+  --surface:    #0F1220;
+  --panel:      #171B2A;
+  --panel2:     #1E2338;
+  --border:     #252B42;
+  --muted:      #363D5C;
+  --subtle:     #5A6490;
+  --body:       #8D99C0;
+  --bright:     #E2E8F8;
+  --amber:      #F0A030;
+  --amber-dim:  #7A5010;
+  --amber-glow: #F0A03018;
+  --teal:       #28B8A0;
+  --teal-glow:  #28B8A018;
+  --violet:     #8060E0;
+  --violet-glow:#8060E018;
+  --red:        #E04858;
+  --green:      #40C878;
+  --fd: 'Syne', sans-serif;
+  --fb: 'Inter', sans-serif;
+  --fm: 'JetBrains Mono', monospace;
+  --r: 10px;
+  --rl: 16px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--fb);background:var(--ink);color:var(--body);min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 32px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:200;
+  background:rgba(8,11,18,0.94);backdrop-filter:blur(14px);
+}
+.logo{font-family:var(--fd);font-weight:800;font-size:1.3rem;color:var(--bright);letter-spacing:.1em}
+.logo span{color:var(--amber)}
+.header-right{display:flex;align-items:center;gap:20px}
+.status-pill{
+  font-family:var(--fm);font-size:.65rem;letter-spacing:.08em;
+  padding:4px 12px;border-radius:20px;
+  border:1px solid var(--border);color:var(--subtle);
+  display:flex;align-items:center;gap:6px;
+}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.status-dot.live{background:var(--red);animation:blink 1s infinite}
+.status-dot.ready{background:var(--green)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── TABS ── */
+.tabs{
+  display:flex;gap:2px;padding:16px 32px 0;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  position:sticky;top:57px;z-index:100;
+}
+.tab{
+  padding:10px 22px;border-radius:8px 8px 0 0;
+  font-family:var(--fd);font-weight:700;font-size:.8rem;
+  letter-spacing:.05em;border:none;cursor:pointer;
+  background:transparent;color:var(--subtle);
+  border-bottom:2px solid transparent;
+  transition:color .2s,border-color .2s,background .2s;
+  display:flex;align-items:center;gap:7px;
+}
+.tab:hover{color:var(--body)}
+.tab.active{color:var(--bright);border-bottom-color:var(--amber);background:var(--panel)}
+.tab-icon{font-size:1rem}
+
+/* ── PANELS ── */
+.tab-panel{display:none;padding:32px;max-width:1160px;margin:0 auto}
+.tab-panel.active{display:block}
+
+/* ── SECTION LABEL ── */
+.slabel{
+  font-family:var(--fm);font-size:.63rem;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:10px;display:block;
+}
+
+/* ── CARDS ── */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rl);padding:22px 24px;
+}
+.card-title{
+  font-family:var(--fd);font-weight:700;font-size:.95rem;
+  color:var(--bright);margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+
+/* ── GRID HELPERS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.mt12{margin-top:12px}.mt16{margin-top:16px}.mt20{margin-top:20px}.mt28{margin-top:28px}
+.divider{height:1px;background:var(--border);margin:24px 0}
+
+/* ── BUTTONS ── */
+.btn{
+  padding:10px 22px;border:none;border-radius:var(--r);cursor:pointer;
+  font-family:var(--fd);font-weight:700;font-size:.82rem;letter-spacing:.04em;
+  transition:opacity .15s,transform .15s;display:inline-flex;align-items:center;gap:7px;
+}
+.btn:hover{opacity:.88;transform:translateY(-1px)}
+.btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.btn-primary{background:var(--amber);color:var(--ink)}
+.btn-secondary{background:var(--panel2);color:var(--body);border:1px solid var(--border)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-teal{background:var(--teal);color:var(--ink)}
+.btn-sm{padding:7px 14px;font-size:.75rem}
+.btn-lg{padding:14px 36px;font-size:.95rem}
+
+/* ── FORM ELEMENTS ── */
+select,input[type=text],input[type=number],textarea{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);color:var(--bright);
+  font-family:var(--fb);font-size:.83rem;
+  padding:9px 12px;outline:none;width:100%;
+  transition:border-color .2s;
+}
+select:focus,input:focus,textarea:focus{border-color:var(--amber)}
+textarea{resize:vertical;min-height:90px;line-height:1.6}
+label.field-label{
+  font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--subtle);
+  display:block;margin-bottom:7px;
+}
+.field{margin-bottom:14px}
+
+/* ── VU METERS ── */
+.vu-wrap{display:flex;flex-direction:column;gap:10px}
+.vu-row{display:flex;align-items:center;gap:10px}
+.vu-name{font-family:var(--fm);font-size:.68rem;color:var(--subtle);width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vu-track{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;position:relative}
+.vu-fill{
+  height:100%;border-radius:4px;width:0%;
+  background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);
+  transition:width .05s linear;
+}
+.vu-val{font-family:var(--fm);font-size:.63rem;color:var(--subtle);width:36px;text-align:right}
+
+/* ── RECORD BUTTON ── */
+.rec-btn{
+  width:64px;height:64px;border-radius:50%;
+  background:var(--red);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .15s,box-shadow .2s;
+  box-shadow:0 0 0 0 rgba(224,72,88,.4);
+  flex-shrink:0;
+}
+.rec-btn:hover{transform:scale(1.06);box-shadow:0 0 0 8px rgba(224,72,88,.2)}
+.rec-btn.recording{animation:recpulse 1s infinite}
+@keyframes recpulse{0%,100%{box-shadow:0 0 0 0 rgba(224,72,88,.6)}50%{box-shadow:0 0 0 14px rgba(224,72,88,0)}}
+.rec-btn svg{width:26px;height:26px;fill:#fff}
+
+/* ── TIMER ── */
+.rec-timer{font-family:var(--fm);font-size:2rem;font-weight:500;color:var(--bright);letter-spacing:.08em}
+.rec-status{font-family:var(--fm);font-size:.7rem;color:var(--subtle);letter-spacing:.1em;margin-top:4px}
+
+/* ── VIDEO PREVIEW ── */
+.video-preview{
+  width:100%;aspect-ratio:16/9;border-radius:var(--r);
+  background:var(--panel2);border:1px solid var(--border);
+  overflow:hidden;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.video-preview video,.video-preview canvas{width:100%;height:100%;object-fit:cover}
+.video-overlay{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;pointer-events:none;
+}
+.video-overlay-text{font-family:var(--fm);font-size:.72rem;color:var(--subtle);letter-spacing:.08em}
+
+/* ── WAVEFORM ── */
+.waveform-canvas{
+  width:100%;height:56px;display:block;border-radius:6px;
+  background:var(--panel2);cursor:pointer;
+}
+
+/* ── STEM TRACKS ── */
+.stem-track{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px 14px;
+  display:flex;align-items:center;gap:14px;
+  transition:border-color .2s;
+}
+.stem-track:hover{border-color:var(--muted)}
+.stem-color{width:4px;border-radius:2px;align-self:stretch;flex-shrink:0}
+.stem-info{flex:1;min-width:0}
+.stem-name{font-family:var(--fd);font-weight:700;font-size:.8rem;color:var(--bright);margin-bottom:4px}
+.stem-meta{font-family:var(--fm);font-size:.62rem;color:var(--subtle)}
+.stem-wave{flex:2;min-width:0}
+.stem-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.vol-slider{width:70px;accent-color:var(--amber)}
+.mute-btn{
+  width:28px;height:28px;border-radius:5px;border:1px solid var(--border);
+  background:transparent;color:var(--subtle);cursor:pointer;font-size:.7rem;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.mute-btn.muted{background:var(--amber-dim);border-color:var(--amber);color:var(--amber)}
+.solo-btn{
+  width:28px;height:28px;border-radius:5px;border:1px solid var(--border);
+  background:transparent;color:var(--subtle);cursor:pointer;font-size:.65rem;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+  font-family:var(--fm);
+}
+.solo-btn.active{background:var(--teal-glow);border-color:var(--teal);color:var(--teal)}
+
+/* ── VOCAL TRAIN ── */
+.upload-drop{
+  border:1.5px dashed var(--border);border-radius:var(--rl);
+  padding:36px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;position:relative;
+  background:var(--surface);
+}
+.upload-drop:hover,.upload-drop.drag-over{border-color:var(--amber);background:var(--amber-glow)}
+.upload-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-drop-icon{font-size:2rem;margin-bottom:8px}
+.upload-drop-title{font-family:var(--fd);font-weight:700;font-size:.95rem;color:var(--bright);margin-bottom:4px}
+.upload-drop-sub{font-size:.78rem;color:var(--subtle)}
+
+/* ── PROGRESS ── */
+.prog-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin:10px 0}
+.prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .5s ease;width:0%}
+.prog-label{font-family:var(--fm);font-size:.68rem;color:var(--subtle)}
+
+/* ── LOG BOX ── */
+.log-box{
+  background:var(--ink);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px 14px;font-family:var(--fm);font-size:.7rem;color:var(--teal);
+  line-height:1.9;max-height:140px;overflow-y:auto;
+}
+
+/* ── BEFORE/AFTER ── */
+.compare-row{display:flex;gap:12px;align-items:stretch}
+.compare-box{
+  flex:1;background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px;text-align:center;
+}
+.compare-label{font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px}
+.compare-box.after{border-color:var(--teal);background:var(--teal-glow)}
+.compare-box.after .compare-label{color:var(--teal)}
+
+/* ── RISYNC TAB ── */
+.scene-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.scene-card{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;
+  transition:border-color .2s;
+}
+.scene-card:hover{border-color:var(--muted)}
+.scene-num{font-family:var(--fm);font-size:.6rem;color:var(--subtle);margin-bottom:6px}
+.scene-thumb{width:100%;aspect-ratio:16/9;border-radius:6px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;overflow:hidden}
+.scene-thumb canvas{width:100%;height:100%}
+.scene-time{font-family:var(--fm);font-size:.62rem;color:var(--subtle);margin-bottom:7px}
+.scene-input{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:5px;color:var(--bright);font-size:.73rem;font-family:var(--fb);
+  padding:6px 9px;outline:none;transition:border-color .2s;
+}
+.scene-input:focus{border-color:var(--amber)}
+.energy-row{display:flex;align-items:center;gap:6px;margin-top:7px}
+.energy-bar-wrap{flex:1;height:3px;background:var(--border);border-radius:2px}
+.energy-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--teal),var(--amber))}
+.energy-lbl{font-family:var(--fm);font-size:.58rem;color:var(--subtle)}
+
+/* ── STYLE BTNS ── */
+.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.style-btn{
+  padding:12px 8px;background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);cursor:pointer;text-align:center;
+  transition:border-color .2s,background .2s;color:var(--body);
+}
+.style-btn:hover{border-color:var(--muted)}
+.style-btn.active{border-color:var(--amber);background:var(--amber-glow);color:var(--bright)}
+.style-btn .si{font-size:1.4rem;margin-bottom:3px}
+.style-btn .sn{font-family:var(--fd);font-weight:700;font-size:.76rem}
+.style-btn .sd{font-size:.62rem;color:var(--subtle);margin-top:2px}
+
+/* ── CONTEXT TAGS ── */
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:.73rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);color:var(--body)}
+.tag.char{border-color:#5060C0;background:#5060C014;color:#A0AAEE}
+.tag.env{border-color:#20A080;background:#20A08014;color:#60D0A0}
+.tag.mood{border-color:var(--amber-dim);background:var(--amber-glow);color:var(--amber)}
+
+/* ── SEND BAR ── */
+.send-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 24px;background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--rl);margin-top:24px;flex-wrap:wrap;gap:14px;
+}
+.send-summary{font-size:.8rem;color:var(--subtle);line-height:1.7}
+.send-summary strong{color:var(--body)}
+
+/* ── INPUT SOURCE SELECTOR ── */
+.source-list{display:flex;flex-direction:column;gap:8px}
+.source-item{
+  display:flex;align-items:center;gap:12px;padding:10px 14px;
+  background:var(--panel2);border:1px solid var(--border);border-radius:var(--r);
+  cursor:pointer;transition:border-color .2s;
+}
+.source-item:hover{border-color:var(--muted)}
+.source-item.selected{border-color:var(--teal);background:var(--teal-glow)}
+.source-check{
+  width:18px;height:18px;border-radius:50%;border:1.5px solid var(--muted);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:all .2s;
+}
+.source-item.selected .source-check{background:var(--teal);border-color:var(--teal)}
+.source-check-dot{width:8px;height:8px;border-radius:50%;background:#fff;display:none}
+.source-item.selected .source-check-dot{display:block}
+.source-name{font-size:.83rem;color:var(--bright);font-weight:500}
+.source-meta{font-family:var(--fm);font-size:.62rem;color:var(--subtle);margin-top:1px}
+.source-channel{
+  margin-left:auto;font-family:var(--fm);font-size:.65rem;
+  padding:3px 8px;border-radius:4px;
+  background:var(--panel);border:1px solid var(--border);color:var(--subtle);
+}
+
+/* ── LOOP INDICATOR ── */
+.loop-grid{display:flex;gap:4px;flex-wrap:wrap}
+.loop-beat{
+  width:18px;height:18px;border-radius:3px;
+  background:var(--panel2);border:1px solid var(--border);
+  transition:background .1s;
+}
+.loop-beat.active{background:var(--amber)}
+.loop-beat.current{background:var(--teal);border-color:var(--teal)}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);
+  background:var(--panel2);border:1px solid var(--border);
+  color:var(--bright);padding:10px 22px;border-radius:40px;
+  font-size:.8rem;opacity:0;transition:opacity .25s,transform .25s;
+  pointer-events:none;z-index:999;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--muted);border-radius:3px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RIS<span>Y</span>NC <span style="font-size:.7rem;font-weight:400;color:var(--subtle);letter-spacing:.05em">STUDIO</span></div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="status-dot" id="rec-indicator"></div>
+      <span id="rec-status-text">Ready</span>
+    </div>
+    <div class="status-pill" id="colab-pill">
+      <div class="status-dot" id="colab-dot"></div>
+      <span id="colab-text">Colab disconnected</span>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" data-tab="record">
+    <span class="tab-icon">⏺</span> Record
+  </button>
+  <button class="tab" data-tab="studio">
+    <span class="tab-icon">🎛</span> Studio Mix
+  </button>
+  <button class="tab" data-tab="vocal">
+    <span class="tab-icon">🎤</span> Vocal
+  </button>
+  <button class="tab" data-tab="risync">
+    <span class="tab-icon">🎬</span> RISYNC
+  </button>
+  <button class="tab" data-tab="session">
+    <span class="tab-icon">🌐</span> Session
+    <span id="session-count-badge" style="display:none;background:var(--red);color:#fff;font-size:.55rem;padding:1px 5px;border-radius:8px;font-family:var(--fm);margin-left:2px">0</span>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB 1 — RECORD                                            -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-record">
+<style>
+/* ── RECORD TAB STYLES ── */
+.rec-layout{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
+@media(max-width:900px){.rec-layout{grid-template-columns:1fr}}
+
+/* Camera grid */
+.cam-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cam-tile{
+  position:relative;border-radius:10px;overflow:hidden;
+  border:2px solid var(--border);aspect-ratio:16/9;
+  background:var(--panel2);cursor:pointer;
+  transition:border-color .2s;
+}
+.cam-tile:hover{border-color:var(--muted)}
+.cam-tile.active-cam{border-color:var(--amber)}
+.cam-tile.phone-waiting{border:2px dashed var(--border)}
+.cam-tile video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-tile-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;
+  pointer-events:none;
+}
+.cam-tile-label{
+  position:absolute;bottom:7px;left:9px;
+  font-family:var(--fm);font-size:.62rem;letter-spacing:.05em;
+  background:rgba(8,11,18,.82);color:var(--bright);
+  padding:3px 9px;border-radius:12px;
+}
+.cam-tile-status{
+  position:absolute;top:8px;right:8px;
+  width:8px;height:8px;border-radius:50%;background:var(--muted);
+}
+.cam-tile-status.live{background:var(--green)}
+.cam-tile-status.waiting{background:var(--amber);animation:blink 1s infinite}
+.cam-tile-status.active{background:var(--amber)}
+.cam-tile-badge{
+  position:absolute;top:8px;left:9px;
+  font-family:var(--fm);font-size:.58rem;
+  background:var(--amber);color:var(--ink);
+  padding:2px 7px;border-radius:10px;font-weight:700;
+}
+.cam-tile-controls{
+  position:absolute;top:6px;right:22px;
+  display:flex;gap:4px;opacity:0;transition:opacity .2s;
+}
+.cam-tile:hover .cam-tile-controls{opacity:1}
+.cam-ctrl-btn{
+  width:22px;height:22px;border-radius:4px;
+  background:rgba(8,11,18,.8);border:none;
+  color:var(--bright);cursor:pointer;font-size:.65rem;
+  display:flex;align-items:center;justify-content:center;
+}
+.add-cam-tile{
+  border:2px dashed var(--border);border-radius:10px;
+  aspect-ratio:16/9;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;transition:border-color .2s,background .2s;
+  background:transparent;
+}
+.add-cam-tile:hover{border-color:var(--amber);background:var(--amber-glow)}
+.add-cam-tile-icon{font-size:1.6rem;color:var(--muted)}
+.add-cam-tile-label{font-family:var(--fm);font-size:.65rem;color:var(--subtle)}
+
+/* QR modal */
+.qr-modal{
+  display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(8,11,18,.88);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+.qr-modal.open{display:flex}
+.qr-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rl);padding:28px;text-align:center;
+  max-width:340px;width:90%;
+}
+.qr-title{font-family:var(--fd);font-weight:800;font-size:1.1rem;color:var(--bright);margin-bottom:6px}
+.qr-sub{font-size:.78rem;color:var(--subtle);margin-bottom:18px;line-height:1.6}
+.qr-canvas-wrap{
+  background:#fff;border-radius:10px;padding:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-bottom:14px;min-width:204px;min-height:204px;
+}
+.qr-canvas-wrap img{ display:block; }
+.qr-canvas-wrap canvas{ display:block; }
+.qr-code-text{
+  font-family:var(--fm);font-size:1.5rem;font-weight:700;
+  color:var(--amber);letter-spacing:.2em;margin-bottom:8px;
+}
+.qr-url{font-family:var(--fm);font-size:.65rem;color:var(--subtle);word-break:break-all;margin-bottom:16px}
+
+/* Professional VU meter */
+.vu-pro{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+.vu-pro-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.vu-pro-name{font-family:var(--fd);font-weight:700;font-size:.8rem;color:var(--bright)}
+.vu-pro-device{font-family:var(--fm);font-size:.62rem;color:var(--subtle)}
+.vu-pro-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.vu-pro-ch{font-family:var(--fm);font-size:.62rem;color:var(--subtle);width:14px;flex-shrink:0}
+.vu-pro-track{
+  flex:1;height:12px;background:var(--panel2);
+  border-radius:2px;overflow:visible;position:relative;
+}
+.vu-pro-rms{
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,#28B8A0 0%,#28B8A0 60%,#F0A030 80%,#E04858 95%);
+  transition:width .04s linear;width:0%;
+}
+.vu-pro-peak-hold{
+  position:absolute;top:0;width:2px;height:100%;
+  background:#fff;opacity:.8;transition:left .1s;left:0%;
+}
+.vu-pro-clip{
+  width:14px;height:12px;border-radius:2px;
+  background:var(--muted);flex-shrink:0;cursor:pointer;
+  transition:background .1s;
+}
+.vu-pro-clip.clipping{background:var(--red)}
+.vu-pro-db{font-family:var(--fm);font-size:.62rem;color:var(--subtle);width:38px;text-align:right}
+
+/* Scale marks */
+.vu-scale{display:flex;justify-content:space-between;padding:0 28px 0 22px;margin-bottom:8px}
+.vu-scale span{font-family:var(--fm);font-size:.55rem;color:var(--muted)}
+
+/* Gain control */
+.gain-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.gain-label{font-family:var(--fm);font-size:.62rem;color:var(--subtle);width:50px;flex-shrink:0}
+.gain-slider{flex:1;accent-color:var(--amber);height:3px}
+.gain-val{font-family:var(--fm);font-size:.65rem;color:var(--amber);width:34px;text-align:right}
+
+/* Device card */
+.device-card{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 16px;margin-bottom:10px;
+  transition:border-color .2s;
+}
+.device-card.selected{border-color:var(--teal)}
+.device-card.clipping-device{border-color:var(--red)}
+.device-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.device-check{
+  width:20px;height:20px;border-radius:50%;
+  border:1.5px solid var(--muted);display:flex;
+  align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;transition:all .2s;
+}
+.device-card.selected .device-check{background:var(--teal);border-color:var(--teal)}
+.device-check-dot{width:8px;height:8px;border-radius:50%;background:#fff;display:none}
+.device-card.selected .device-check-dot{display:block}
+.device-name{font-family:var(--fd);font-weight:700;font-size:.82rem;color:var(--bright);flex:1}
+.device-type{
+  font-family:var(--fm);font-size:.6rem;padding:2px 8px;
+  border-radius:10px;background:var(--panel);
+  border:1px solid var(--border);color:var(--subtle);
+}
+.device-type.interface{border-color:#5060C0;color:#A0AAEE;background:#5060C014}
+.device-type.builtin{border-color:var(--muted);color:var(--subtle)}
+.device-options{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.opt-btn{
+  font-family:var(--fm);font-size:.62rem;padding:3px 9px;
+  border-radius:5px;border:1px solid var(--border);
+  background:transparent;color:var(--subtle);cursor:pointer;
+  transition:all .15s;
+}
+.opt-btn:hover{border-color:var(--muted);color:var(--body)}
+.opt-btn.active{border-color:var(--amber);color:var(--amber);background:var(--amber-glow)}
+
+/* Auto-gain button */
+.autogain-btn{
+  font-family:var(--fm);font-size:.65rem;padding:5px 12px;
+  border-radius:var(--r);border:1px solid var(--border);
+  background:var(--panel);color:var(--subtle);cursor:pointer;
+  transition:all .2s;display:flex;align-items:center;gap:5px;
+}
+.autogain-btn:hover{border-color:var(--teal);color:var(--teal)}
+.autogain-btn.running{border-color:var(--amber);color:var(--amber);animation:none}
+
+/* Live waveform */
+.live-wave-wrap{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 12px;margin-top:10px;
+}
+.live-wave-canvas{width:100%;height:48px;display:block;border-radius:4px}
+
+/* Transport */
+.transport-bar{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 20px;background:var(--panel2);
+  border:1px solid var(--border);border-radius:var(--r);
+  flex-wrap:wrap;
+}
+.transport-timer{
+  font-family:var(--fm);font-size:1.6rem;font-weight:500;
+  color:var(--bright);letter-spacing:.08em;min-width:100px;
+}
+.transport-status{font-family:var(--fm);font-size:.68rem;color:var(--subtle);margin-top:2px}
+.transport-btns{display:flex;gap:8px;margin-left:auto}
+
+/* Beat grid */
+.beat-grid{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+.beat-cell{
+  width:20px;height:20px;border-radius:3px;
+  border:1px solid var(--border);background:var(--panel2);
+  transition:background .08s,border-color .08s;
+}
+.beat-cell.on{background:var(--amber);border-color:var(--amber)}
+.beat-cell.now{background:var(--teal);border-color:var(--teal);box-shadow:0 0 6px var(--teal)}
+.beat-cell.bar-start{border-color:var(--subtle)}
+
+/* Tap tempo */
+.tap-btn{
+  padding:8px 16px;background:var(--panel2);border:1px solid var(--border);
+  border-radius:var(--r);color:var(--body);font-family:var(--fd);
+  font-weight:700;font-size:.75rem;cursor:pointer;
+  transition:background .1s,border-color .1s;
+  user-select:none;
+}
+.tap-btn:active{background:var(--amber-glow);border-color:var(--amber)}
+
+/* Takes list */
+.take-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;background:var(--panel2);
+  border:1px solid var(--border);border-radius:var(--r);
+  margin-bottom:8px;transition:border-color .2s;
+}
+.take-row:hover{border-color:var(--muted)}
+.take-row.best-take{border-color:var(--amber)}
+.take-num{font-family:var(--fm);font-size:.7rem;color:var(--subtle);width:50px;flex-shrink:0}
+.take-dur{font-family:var(--fm);font-size:.72rem;color:var(--bright);width:44px;flex-shrink:0}
+.take-note{
+  flex:1;background:transparent;border:none;
+  font-family:var(--fb);font-size:.75rem;color:var(--body);
+  outline:none;min-width:0;
+}
+.take-note::placeholder{color:var(--muted)}
+.take-btns{display:flex;gap:5px;flex-shrink:0}
+.take-btn{
+  width:26px;height:26px;border-radius:5px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--subtle);cursor:pointer;font-size:.72rem;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.take-btn:hover{border-color:var(--muted);color:var(--bright)}
+.take-btn.use{border-color:var(--teal);color:var(--teal)}
+.take-btn.use:hover{background:var(--teal);color:var(--ink)}
+.take-btn.del:hover{border-color:var(--red);color:var(--red)}
+
+/* Trim modal */
+.trim-modal{
+  display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(8,11,18,.9);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+.trim-modal.open{display:flex}
+.trim-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rl);padding:24px;width:90%;max-width:600px;
+}
+.trim-title{font-family:var(--fd);font-weight:800;font-size:1rem;color:var(--bright);margin-bottom:14px}
+.trim-wave{width:100%;height:80px;border-radius:6px;background:var(--panel2);display:block;cursor:crosshair}
+.trim-controls{display:flex;gap:10px;margin-top:14px;align-items:center;flex-wrap:wrap}
+.trim-point{font-family:var(--fm);font-size:.72rem;color:var(--subtle)}
+.trim-point span{color:var(--amber)}
+</style>
+
+<!-- QR Modal — uses qrcode.js for real scannable QR -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<div class="qr-modal" id="qr-modal">
+  <div class="qr-box">
+    <div class="qr-title">Add Phone Camera</div>
+    <div class="qr-sub">Scan with your phone camera app — no QR scanner app needed. Works on iPhone and Android.</div>
+    <div class="qr-canvas-wrap">
+      <div id="qr-canvas"></div>
+    </div>
+    <div class="qr-code-text" id="qr-room-code">——</div>
+    <div class="qr-url" id="qr-url-text">—</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="copy-qr-link-btn">Copy link</button>
+      <button class="btn btn-secondary btn-sm" id="close-qr-btn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trim Modal -->
+<div class="trim-modal" id="trim-modal">
+  <div class="trim-box">
+    <div class="trim-title">Trim Take</div>
+    <canvas class="trim-wave" id="trim-wave"></canvas>
+    <div style="position:relative;height:24px;margin-top:6px">
+      <input type="range" id="trim-in" min="0" max="100" value="0" style="position:absolute;width:100%;accent-color:var(--teal)">
+      <input type="range" id="trim-out" min="0" max="100" value="100" style="position:absolute;width:100%;accent-color:var(--amber)">
+    </div>
+    <div class="trim-controls">
+      <div class="trim-point">In: <span id="trim-in-val">0:00</span></div>
+      <div class="trim-point" style="margin-left:auto">Out: <span id="trim-out-val">0:00</span></div>
+      <button class="btn btn-secondary btn-sm" id="trim-play-btn">▶ Preview</button>
+      <button class="btn btn-primary btn-sm" id="trim-apply-btn">Apply trim</button>
+      <button class="btn btn-secondary btn-sm" id="trim-cancel-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="rec-layout">
+
+  <!-- ── LEFT COLUMN ── -->
+  <div>
+
+    <!-- Camera Grid -->
+    <span class="slabel">Cameras</span>
+    <div class="cam-grid" id="cam-grid">
+      <!-- Webcam tile -->
+      <div class="cam-tile active-cam" id="cam-tile-webcam" onclick="REC.setActiveCamera('webcam',this)">
+        <video id="webcam-video" autoplay muted playsinline></video>
+        <div class="cam-tile-overlay" id="webcam-overlay">
+          <div style="font-size:1.8rem">📷</div>
+          <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Starting camera...</div>
+        </div>
+        <div class="cam-tile-badge">ACTIVE</div>
+        <div class="cam-tile-label" id="webcam-label">Webcam</div>
+        <div class="cam-tile-status live" id="webcam-status"></div>
+        <div class="cam-tile-controls">
+          <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.renameCamera('webcam')" title="Rename">✏</button>
+        </div>
+      </div>
+      <!-- Add phone tile -->
+      <div class="add-cam-tile" id="add-phone-tile" onclick="REC.openQR()">
+        <div class="add-cam-tile-icon">📱</div>
+        <div class="add-cam-tile-label">+ Add phone camera</div>
+        <div style="font-family:var(--fm);font-size:.58rem;color:var(--muted);margin-top:2px">Scan QR — no app needed</div>
+      </div>
+    </div>
+
+    <!-- Camera source selector -->
+    <div class="card mt16">
+      <div class="card-title" style="margin-bottom:10px;font-size:.82rem">Webcam source
+        <button class="btn btn-secondary btn-sm" id="refresh-cams-btn" style="margin-left:auto;padding:4px 10px;font-size:.65rem">↻ Refresh</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="webcam-select" style="flex:1;font-size:.78rem;padding:7px 10px">
+          <option value="">Scanning cameras...</option>
+        </select>
+        <button class="btn btn-teal btn-sm" id="switch-cam-btn">Switch</button>
+      </div>
+      <div style="font-family:var(--fm);font-size:.62rem;color:var(--subtle);margin-top:8px">
+        OBS Virtual Camera appears here when OBS is running with Virtual Camera enabled.
+      </div>
+    </div>
+
+    <!-- Live waveform -->
+    <div class="live-wave-wrap mt16">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Live Input</span>
+        <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)" id="live-wave-device">No device selected</span>
+      </div>
+      <canvas class="live-wave-canvas" id="live-wave-canvas"></canvas>
+    </div>
+
+    <!-- Transport -->
+    <div class="transport-bar mt16">
+      <button class="rec-btn" id="rec-btn" disabled>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      </button>
+      <div>
+        <div class="transport-timer" id="rec-timer">0:00:00</div>
+        <div class="transport-status" id="rec-status">Select an audio input to begin</div>
+      </div>
+      <div class="transport-btns">
+        <button class="btn btn-secondary btn-sm" id="pause-btn" disabled>⏸ Pause</button>
+        <button class="btn btn-secondary btn-sm" id="stop-btn" disabled>■ Stop</button>
+        <button class="btn btn-secondary btn-sm" id="discard-btn" disabled>✕ Discard</button>
+      </div>
+    </div>
+
+    <!-- Takes -->
+    <div class="mt16">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span class="slabel" style="margin-bottom:0">Takes</span>
+        <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)" id="takes-count">0 takes</span>
+      </div>
+      <div id="takes-list">
+        <div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle);padding:14px;text-align:center;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r)">
+          No takes yet — hit record to start
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT COLUMN ── -->
+  <div>
+
+    <!-- Audio inputs -->
+    <span class="slabel">Audio Interface</span>
+    <div class="card" style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0;font-size:.82rem">Input devices</div>
+        <button class="btn btn-secondary btn-sm" id="refresh-inputs-btn" style="padding:4px 10px;font-size:.65rem">↻ Scan</button>
+      </div>
+      <div id="device-list">
+        <div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)">Scanning for audio devices...</div>
+      </div>
+    </div>
+
+    <!-- VU Meters -->
+    <div class="card mt16" style="padding:16px" id="vu-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="card-title" style="margin-bottom:0;font-size:.82rem">Levels</div>
+        <button class="autogain-btn" id="autogain-btn" title="Analyses 5 seconds of signal and sets gain to -18dBFS">
+          ⚡ Auto-gain
+        </button>
+      </div>
+      <!-- dB scale -->
+      <div class="vu-scale">
+        <span>-∞</span><span>-40</span><span>-20</span><span>-12</span><span>-6</span><span>-3</span><span>0</span>
+      </div>
+      <div id="vu-meters">
+        <div style="font-family:var(--fm);font-size:.7rem;color:var(--subtle)">Select an input device to see levels</div>
+      </div>
+    </div>
+
+    <!-- MIDI / RC-10 -->
+    <div class="card mt16" style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0;font-size:.82rem">MIDI Sync</div>
+        <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)" id="midi-status">Scanning...</span>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">BPM</div>
+          <div style="font-family:var(--fm);font-size:1.6rem;font-weight:500;color:var(--bright)" id="loop-bpm">—</div>
+        </div>
+        <div>
+          <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Bar</div>
+          <div style="font-family:var(--fm);font-size:1.6rem;font-weight:500;color:var(--bright)" id="loop-bar">—</div>
+        </div>
+        <div>
+          <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Beat</div>
+          <div style="font-family:var(--fm);font-size:1.6rem;font-weight:500;color:var(--bright)" id="loop-beat-disp">—</div>
+        </div>
+        <div>
+          <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Device</div>
+          <div style="font-family:var(--fm);font-size:.72rem;color:var(--body);margin-top:4px" id="midi-device-name">None</div>
+        </div>
+      </div>
+
+      <div class="beat-grid" id="loop-grid"></div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+        <button class="tap-btn" id="tap-btn">Tap tempo</button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+          <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)">Manual BPM</span>
+          <input type="number" id="manual-bpm" min="40" max="300" value="120"
+            style="width:64px;font-family:var(--fm);font-size:.82rem;padding:5px 8px;text-align:center">
+        </div>
+      </div>
+      <div style="font-family:var(--fm);font-size:.62rem;color:var(--subtle);margin-top:8px;line-height:1.6">
+        Connect RC-10 via USB MIDI or through your audio interface MIDI port. BPM syncs automatically from MIDI clock.
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB 2 — STUDIO MIX                                        -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-studio">
+
+  <div class="g2" style="align-items:start">
+    <div>
+      <span class="slabel">Stems</span>
+      <div id="stem-tracks">
+        <div class="card" style="font-family:var(--fm);font-size:.78rem;color:var(--subtle);text-align:center;padding:32px">
+          Record a take first, or import an audio file below.
+        </div>
+      </div>
+
+      <div class="mt16">
+        <span class="slabel">Import audio file</span>
+        <div class="upload-drop" id="import-drop">
+          <input type="file" id="import-file" accept=".mp3,.wav,.webm,.ogg,.aac,.flac,.m4a">
+          <div class="upload-drop-icon">🎵</div>
+          <div class="upload-drop-title">Drop your mix here</div>
+          <div class="upload-drop-sub">MP3 · WAV · WEBM · OGG · AAC · FLAC · M4A</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <span class="slabel">Master</span>
+      <div class="card">
+        <div class="card-title">Playback</div>
+        <canvas class="waveform-canvas" id="master-waveform"></canvas>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+          <button class="btn btn-secondary btn-sm" id="master-play-btn">▶ Play</button>
+          <span style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)" id="master-time">0:00 / 0:00</span>
+        </div>
+        <div class="divider"></div>
+        <div class="field">
+          <label class="field-label">Master volume</label>
+          <input type="range" id="master-vol" min="0" max="100" value="85" style="accent-color:var(--amber);width:100%">
+        </div>
+        <div class="field">
+          <label class="field-label">Vocal track volume</label>
+          <input type="range" id="vocal-vol" min="0" max="100" value="75" style="accent-color:var(--teal);width:100%">
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" id="send-to-vocal-btn">Send vocal stem to processing →</button>
+      </div>
+
+      <div class="card mt16">
+        <div class="card-title">Export mix</div>
+        <div class="field">
+          <label class="field-label">Format</label>
+          <select id="export-format">
+            <option value="wav">WAV 44.1kHz (lossless)</option>
+            <option value="mp3">MP3 320kbps</option>
+            <option value="flac">FLAC (archival)</option>
+          </select>
+        </div>
+        <button class="btn btn-teal" id="export-mix-btn" disabled>↓ Export master mix</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB 3 — VOCAL                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-vocal">
+
+  <div class="g2" style="align-items:start">
+
+    <!-- LEFT: RVC Model -->
+    <div>
+      <span class="slabel">Your Voice Model</span>
+      <div class="card">
+        <div class="card-title">Train RVC on your voice</div>
+        <p style="font-size:.8rem;color:var(--subtle);line-height:1.7;margin-bottom:16px">
+          Record or upload 10–30 minutes of your voice — singing, talking, humming. RVC learns the unique characteristics of your voice and applies them to correct your vocal takes. This is a one-time setup saved to your Google Drive.
+        </p>
+
+        <div class="upload-drop" id="voice-sample-drop">
+          <input type="file" id="voice-sample-input" accept=".mp3,.wav,.webm,.ogg,.m4a" multiple>
+          <div class="upload-drop-icon">🎙️</div>
+          <div class="upload-drop-title">Upload your voice samples</div>
+          <div class="upload-drop-sub">Multiple files OK · Any format · Min 10 mins total</div>
+        </div>
+
+        <div id="voice-sample-list" class="mt12" style="display:none">
+          <div class="slabel" style="margin-bottom:6px">Samples loaded</div>
+          <div id="voice-sample-files" style="font-family:var(--fm);font-size:.72rem;color:var(--subtle);line-height:2"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <span style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)" id="voice-total-dur">Total: 0:00</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <label class="field-label">Model name</label>
+          <input type="text" id="model-name" placeholder="e.g. Richard_v1" value="">
+        </div>
+        <div class="field">
+          <label class="field-label">Training epochs</label>
+          <select id="train-epochs">
+            <option value="100">100 — Quick (20 mins on Colab)</option>
+            <option value="200" selected>200 — Balanced (40 mins)</option>
+            <option value="400">400 — Best quality (80 mins)</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" id="train-rvc-btn" disabled>Send to Colab for training →</button>
+
+        <div id="train-progress" style="display:none;margin-top:16px">
+          <div class="prog-track"><div class="prog-fill" id="train-prog-fill"></div></div>
+          <div class="prog-label" id="train-prog-label">Waiting for Colab worker...</div>
+          <div class="log-box mt12" id="train-log"></div>
+        </div>
+
+        <div id="model-ready" style="display:none;margin-top:14px">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--teal-glow);border:1px solid var(--teal);border-radius:var(--r)">
+            <span style="font-size:1.1rem">✅</span>
+            <div>
+              <div style="font-family:var(--fd);font-weight:700;font-size:.8rem;color:var(--teal)">Model ready</div>
+              <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)" id="model-ready-name"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Vocal processing -->
+    <div>
+      <span class="slabel">Vocal Processing</span>
+      <div class="card">
+        <div class="card-title">Apply to vocal take</div>
+
+        <div class="upload-drop" id="vocal-take-drop" style="padding:24px">
+          <input type="file" id="vocal-take-input" accept=".mp3,.wav,.webm,.ogg,.m4a">
+          <div class="upload-drop-icon">🎵</div>
+          <div class="upload-drop-title">Drop your raw vocal take</div>
+          <div class="upload-drop-sub">Or it auto-fills from your Studio recording</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <label class="field-label">Pitch correction strength</label>
+          <input type="range" id="pitch-strength" min="0" max="100" value="60" style="accent-color:var(--amber);width:100%">
+          <div style="display:flex;justify-content:space-between;margin-top:4px">
+            <span style="font-family:var(--fm);font-size:.6rem;color:var(--subtle)">Natural</span>
+            <span style="font-family:var(--fm);font-size:.68rem;color:var(--amber)" id="pitch-val">60%</span>
+            <span style="font-family:var(--fm);font-size:.6rem;color:var(--subtle)">Precise</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Beat alignment</label>
+          <select id="beat-align">
+            <option value="off">Off — keep original timing</option>
+            <option value="soft" selected>Soft — nudge to grid</option>
+            <option value="hard">Hard — snap to beat</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Noise gate</label>
+          <select id="noise-gate">
+            <option value="off">Off</option>
+            <option value="light" selected>Light — remove breath noise</option>
+            <option value="medium">Medium — clean silence</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Reverb</label>
+          <input type="range" id="reverb-amt" min="0" max="100" value="20" style="accent-color:var(--violet);width:100%">
+          <div style="text-align:right;margin-top:3px">
+            <span style="font-family:var(--fm);font-size:.65rem;color:var(--violet)" id="reverb-val">20%</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="process-vocal-btn" disabled>Process vocal →</button>
+
+        <div id="process-progress" style="display:none;margin-top:14px">
+          <div class="prog-track"><div class="prog-fill" id="proc-prog-fill"></div></div>
+          <div class="prog-label" id="proc-prog-label">Processing...</div>
+          <div class="log-box mt12" id="proc-log"></div>
+        </div>
+      </div>
+
+      <!-- Before / After -->
+      <div class="card mt16" id="compare-card" style="display:none">
+        <div class="card-title">Compare</div>
+        <div class="compare-row">
+          <div class="compare-box">
+            <div class="compare-label">Original</div>
+            <canvas class="waveform-canvas" id="orig-wave" style="height:40px"></canvas>
+            <button class="btn btn-secondary btn-sm mt12" id="play-orig-btn">▶ Play</button>
+          </div>
+          <div class="compare-box after">
+            <div class="compare-label">Processed</div>
+            <canvas class="waveform-canvas" id="proc-wave" style="height:40px"></canvas>
+            <button class="btn btn-teal btn-sm mt12" id="play-proc-btn">▶ Play</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" id="accept-vocal-btn">Accept &amp; move to mix →</button>
+          <button class="btn btn-secondary" id="reprocess-btn">Re-process</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB 4 — RISYNC                                            -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-risync">
+
+  <div class="g2" style="align-items:start">
+
+    <!-- LEFT -->
+    <div>
+      <span class="slabel">Track</span>
+      <div class="card" id="risync-track-card">
+        <div class="card-title">Audio source</div>
+        <div id="risync-track-info" style="font-family:var(--fm);font-size:.75rem;color:var(--subtle)">
+          No master mix yet — complete the Studio Mix stage first, or upload below.
+        </div>
+        <div class="upload-drop mt12" id="risync-audio-drop" style="padding:20px">
+          <input type="file" id="risync-audio-input" accept=".mp3,.wav,.webm,.ogg,.aac,.flac,.m4a">
+          <div class="upload-drop-icon" style="font-size:1.4rem">🎵</div>
+          <div class="upload-drop-title" style="font-size:.85rem">Upload master mix</div>
+          <div class="upload-drop-sub">Or it auto-fills from Studio Mix</div>
+        </div>
+        <div id="risync-audio-stats" style="display:none" class="mt12">
+          <div class="audio-stats-row" style="display:flex;gap:20px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+
+      <div class="card mt16">
+        <div class="card-title">Performance video</div>
+        <div id="risync-video-info" style="font-family:var(--fm);font-size:.75rem;color:var(--subtle);margin-bottom:12px">
+          Your OBS recording will appear here after a take. Or upload below.
+        </div>
+        <div class="upload-drop" id="risync-video-drop" style="padding:20px">
+          <input type="file" id="risync-video-input" accept=".mp4,.webm,.mov">
+          <div class="upload-drop-icon" style="font-size:1.4rem">🎬</div>
+          <div class="upload-drop-title" style="font-size:.85rem">Upload performance video</div>
+          <div class="upload-drop-sub">MP4 · WEBM · MOV (from OBS or browser)</div>
+        </div>
+        <div class="field mt12">
+          <label class="field-label">Performance video usage</label>
+          <select id="perf-video-mode">
+            <option value="intercut">Intercut with AI scenes</option>
+            <option value="overlay">Overlay on AI scenes</option>
+            <option value="base">Use as base, AI adds effects</option>
+            <option value="none">AI scenes only</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card mt16">
+        <div class="card-title">Storyline &amp; Lyrics</div>
+        <div class="field">
+          <label class="field-label">Song story / lyrics / context</label>
+          <textarea id="risync-storyline" placeholder="Describe your song's story, paste your lyrics, describe characters and environments. The AI uses this to generate visuals that match your song's narrative.&#10;&#10;e.g. A story of leaving a city behind at night — rain-soaked streets, headlights reflecting on tarmac, feeling free but uncertain..."></textarea>
+        </div>
+        <button class="btn btn-primary" id="risync-analyse-btn" disabled>Analyse &amp; build scenes →</button>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <span class="slabel">Context</span>
+      <div class="g2 mt0" id="risync-context-grid" style="display:none">
+        <!-- filled by JS -->
+      </div>
+
+      <div id="risync-scenes-section" style="display:none;margin-top:20px">
+        <span class="slabel">Scenes</span>
+        <p style="font-size:.78rem;color:var(--subtle);margin-bottom:12px">Auto-generated from your storyline and audio energy. Edit any scene prompt.</p>
+        <div class="scene-grid" id="risync-scene-grid"></div>
+      </div>
+
+      <div id="risync-style-section" style="display:none;margin-top:20px">
+        <span class="slabel">Visual Style</span>
+        <div class="style-grid mt12" id="risync-style-grid">
+          <button class="style-btn active" data-style="Cinematic"><div class="si">🎬</div><div class="sn">Cinematic</div><div class="sd">Film grain, drama</div></button>
+          <button class="style-btn" data-style="Abstract"><div class="si">🌀</div><div class="sn">Abstract</div><div class="sd">Shapes, fluid</div></button>
+          <button class="style-btn" data-style="Nature"><div class="si">🌿</div><div class="sn">Nature</div><div class="sd">Landscape, light</div></button>
+          <button class="style-btn" data-style="Urban"><div class="si">🏙️</div><div class="sn">Urban</div><div class="sd">City, neon</div></button>
+          <button class="style-btn" data-style="Surreal"><div class="si">🌙</div><div class="sn">Surreal</div><div class="sd">Dreamlike</div></button>
+          <button class="style-btn" data-style="Retro"><div class="si">📼</div><div class="sn">Retro</div><div class="sd">80s, VHS</div></button>
+        </div>
+
+        <div class="g3 mt16">
+          <div class="field">
+            <label class="field-label">Resolution</label>
+            <select id="vs-resolution"><option value="720p">720p</option><option value="1080p" selected>1080p</option><option value="4k">4K</option></select>
+          </div>
+          <div class="field">
+            <label class="field-label">Clip length</label>
+            <select id="vs-clip-len"><option value="5">5 sec</option><option value="9" selected>9 sec</option></select>
+          </div>
+          <div class="field">
+            <label class="field-label">Transition</label>
+            <select id="vs-transition"><option value="crossfade" selected>Crossfade</option><option value="cut">Hard cut</option><option value="dissolve">Dissolve</option></select>
+          </div>
+        </div>
+
+        <div class="send-bar" id="risync-send-bar">
+          <div class="send-summary" id="risync-send-summary">—</div>
+          <button class="btn btn-primary btn-lg" id="risync-send-btn">Send for creation →</button>
+        </div>
+      </div>
+
+      <!-- Generation status -->
+      <div id="risync-status" style="display:none;margin-top:20px">
+        <span class="slabel">Generation</span>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+            <div class="status-dot live"></div>
+            <div style="font-family:var(--fd);font-weight:700;font-size:.9rem;color:var(--bright)" id="vs-status-title">Processing...</div>
+          </div>
+          <div class="prog-track"><div class="prog-fill" id="vs-prog-fill"></div></div>
+          <div class="prog-label mt12" id="vs-prog-label">0%</div>
+          <div class="log-box mt12" id="vs-log"></div>
+        </div>
+      </div>
+
+      <!-- Video result -->
+      <div id="risync-result" style="display:none;margin-top:20px">
+        <span class="slabel">Result</span>
+        <div class="card" style="padding:0;overflow:hidden">
+          <video id="result-video" controls style="width:100%;display:block"></video>
+          <div style="padding:14px 18px;display:flex;gap:10px">
+            <a class="btn btn-primary btn-sm" id="dl-video-btn" href="#" download="risync-video.mp4">↓ Download video</a>
+            <button class="btn btn-secondary btn-sm" id="new-video-btn">New video</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TAB 5 — SESSION (Multi-camera + Remote musicians)         -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-session">
+
+  <div class="g2" style="align-items:start">
+
+    <!-- LEFT: Session control -->
+    <div>
+      <span class="slabel">Your Session</span>
+      <div class="card" id="session-setup-card">
+        <div class="card-title">Create a session room</div>
+        <div class="field">
+          <label class="field-label">Session name</label>
+          <input type="text" id="session-name-input" placeholder="e.g. Richard's Studio — Track 3">
+        </div>
+        <div class="field">
+          <label class="field-label">Your name (host)</label>
+          <input type="text" id="host-name-input" placeholder="e.g. Richard">
+        </div>
+        <button class="btn btn-primary" id="create-room-btn">Create session →</button>
+      </div>
+
+      <!-- Room live card (shown after creation) -->
+      <div class="card" id="session-live-card" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div class="status-dot live"></div>
+          <div style="font-family:var(--fd);font-weight:700;font-size:.95rem;color:var(--bright)" id="session-live-name">Session live</div>
+        </div>
+
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px">
+          <div class="slabel" style="margin-bottom:6px">Room code</div>
+          <div style="font-family:var(--fm);font-size:1.8rem;font-weight:500;color:var(--amber);letter-spacing:.2em" id="room-code-display">——</div>
+          <div style="font-size:.75rem;color:var(--subtle);margin-top:6px">Share this code with musicians to join</div>
+        </div>
+
+        <!-- QR Code -->
+        <div style="background:var(--panel2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;text-align:center">
+          <div class="slabel" style="margin-bottom:10px">Scan to join (phone / tablet)</div>
+          <canvas id="qr-canvas" style="border-radius:6px;background:#fff;padding:8px"></canvas>
+          <div style="font-size:.72rem;color:var(--subtle);margin-top:8px" id="join-url-display">—</div>
+        </div>
+
+        <!-- Invite link -->
+        <div class="field">
+          <label class="field-label">Invite link</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="invite-link" readonly style="font-size:.72rem;font-family:var(--fm)">
+            <button class="btn btn-secondary btn-sm" id="copy-link-btn" style="white-space:nowrap">Copy</button>
+          </div>
+        </div>
+
+        <button class="btn btn-danger btn-sm" id="end-session-btn">End session</button>
+      </div>
+
+      <!-- Connected participants -->
+      <div class="card mt16" id="participants-card" style="display:none">
+        <div class="card-title">Participants</div>
+        <div id="host-participants-list" style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)">Waiting for musicians...</div>
+        </div>
+      </div>
+
+      <!-- Session chat -->
+      <div class="card mt16" id="session-chat-card" style="display:none">
+        <div class="card-title" style="margin-bottom:10px">Session chat</div>
+        <div class="log-box" id="session-chat-log" style="color:var(--body)"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="text" id="session-chat-input" placeholder="Message all participants..." style="flex:1">
+          <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Camera grid -->
+    <div>
+      <span class="slabel">Camera Grid</span>
+      <div id="camera-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">
+          <div style="font-size:1.5rem">📷</div>
+          <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Your webcam</div>
+          <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted)">from Record tab</div>
+        </div>
+        <div id="add-cam-slot" style="aspect-ratio:4/3;background:var(--panel2);border:2px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;cursor:pointer;transition:border-color .2s" onclick="document.getElementById('create-room-btn').scrollIntoView({behavior:'smooth'})">
+          <div style="font-size:1.5rem">＋</div>
+          <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Create session</div>
+          <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted)">to add musicians</div>
+        </div>
+      </div>
+
+      <!-- Audio mix per participant -->
+      <div class="card mt16" id="remote-mix-card" style="display:none">
+        <div class="card-title" style="margin-bottom:12px">Remote audio mix</div>
+        <div id="remote-audio-channels" style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)">No remote participants yet.</div>
+        </div>
+      </div>
+
+      <!-- Recording mode -->
+      <div class="card mt16">
+        <div class="card-title" style="margin-bottom:12px">Recording mode</div>
+        <div class="g2" style="gap:8px">
+          <button class="style-btn active" id="mode-director" onclick="setRecMode('director',this)">
+            <div class="si">🎬</div>
+            <div class="sn">Director</div>
+            <div class="sd">Click to switch live</div>
+          </button>
+          <button class="style-btn" id="mode-multitrack" onclick="setRecMode('multitrack',this)">
+            <div class="si">🎞</div>
+            <div class="sn">Multitrack</div>
+            <div class="sd">All angles, edit after</div>
+          </button>
+        </div>
+        <div style="font-size:.75rem;color:var(--subtle);margin-top:12px;line-height:1.6" id="mode-desc">
+          <strong style="color:var(--body)">Director mode:</strong> click any camera tile during recording to switch the active angle. Output is one video with your cuts baked in.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+const S = {
+  // Record
+  audioCtx: null, mediaStream: null, mediaRecorder: null,
+  recStartTime: null, recTimerInterval: null,
+  videoStream: null, takes: [],
+  vuAnimFrame: null, analyserNodes: [],
+  selectedInputs: new Set(), selectedVideoId: null,
+  midiAccess: null, loopBPM: 0, loopBeat: 0, loopLen: 16,
+  // Studio
+  audioBuffer: null, audioFile: null, masterAudio: null,
+  stems: [], vocalStemBlob: null,
+  // Vocal
+  voiceSampleFiles: [], voiceModelName: null,
+  vocalTakeBlob: null, processedVocalBlob: null,
+  // RISYNC
+  risyncAudioBuffer: null, risyncAudioFile: null,
+  risyncVideoFile: null, risyncSections: [],
+  risyncContext: null, risyncStyle: 'Cinematic',
+  // Backend
+  BACKEND: window.BACKEND_URL || 'http://localhost:3000',
+};
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+const $  = id => document.getElementById(id);
+const fmt = s => { const m=Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; };
+const fmtH = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=Math.floor(s%60); return `${h}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`; };
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function log(elId,msg){ const b=$(elId); if(!b) return; b.innerHTML+=`<div>» ${msg}</div>`; b.scrollTop=b.scrollHeight; }
+function setProgress(fillId,labelId,pct,label){ $(fillId).style.width=pct+'%'; $(labelId).textContent=label||pct+'%'; }
+
+// ══════════════════════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('tab-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// RECORD TAB — Full professional implementation
+// ══════════════════════════════════════════════════════════════
+
+const REC = {
+  // State
+  audioCtx: null,
+  mediaRecorder: null,
+  videoStream: null,
+  audioStream: null,
+  mixedStream: null,
+  recStartTime: null,
+  recInterval: null,
+  paused: false,
+  takes: [],
+  takeCount: 0,
+  selectedDeviceId: null,
+  gainNode: null,
+  analyserL: null,
+  analyserR: null,
+  vuFrame: null,
+  waveFrame: null,
+  waveData: [],
+  peakL: 0, peakR: 0,
+  peakHoldL: 0, peakHoldR: 0,
+  peakTimerL: null, peakTimerR: null,
+  clippedL: false, clippedR: false,
+  gainL: 0.8, gainR: 0.8,
+  activeCamId: 'webcam',
+  phoneCams: new Map(),
+  phoneCount: 0,
+  trimTake: null,
+  tapTimes: [],
+  midiAccess: null,
+  loopBPM: 0, loopBeat: 0, loopBar: 0,
+  midiClockCount: 0, lastMidiClock: 0, midiClockTimes: [],
+  manualBPM: 120,
+  loopBeats: 16,
+
+  // ── Init ────────────────────────────────────────────────────
+  async init() {
+    await this.requestPermissions();
+    await this.enumDevices();
+    await this.startWebcam();
+    this.initMIDI();
+    this.buildBeatGrid(16);
+    this.startLiveWave();
+    this.bindEvents();
+  },
+
+  async requestPermissions() {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      s.getTracks().forEach(t => t.stop());
+    } catch(e) {}
+  },
+
+  // ── Device enumeration ───────────────────────────────────────
+  async enumDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    this.renderAudioDevices(devices.filter(d => d.kind === 'audioinput'));
+    this.renderVideoDevices(devices.filter(d => d.kind === 'videoinput'));
+  },
+
+  getDeviceType(label) {
+    const l = label.toLowerCase();
+    if (l.includes('scarlett') || l.includes('focusrite')) return { type:'interface', name:'Focusrite Scarlett' };
+    if (l.includes('sparkgo') || l.includes('spark go') || l.includes('spark ')) return { type:'interface', name:'SparkGo' };
+    if (l.includes('behringer') || l.includes('xr16') || l.includes('umc')) return { type:'interface', name:'Behringer' };
+    if (l.includes('ssl')) return { type:'interface', name:'SSL' };
+    if (l.includes('motu')) return { type:'interface', name:'MOTU' };
+    if (l.includes('universal audio') || l.includes('apollo')) return { type:'interface', name:'Universal Audio' };
+    if (l.includes('presonus')) return { type:'interface', name:'PreSonus' };
+    if (l.includes('steinberg')) return { type:'interface', name:'Steinberg' };
+    if (l.includes('built-in') || l.includes('internal') || l.includes('realtek') || l.includes('hd audio')) return { type:'builtin', name:'Built-in' };
+    return { type:'interface', name:'Audio Interface' };
+  },
+
+  renderAudioDevices(devices) {
+    const list = $('device-list');
+    if (!devices.length) {
+      list.innerHTML = '<div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)">No audio inputs found. Check connections.</div>';
+      return;
+    }
+    list.innerHTML = devices.map((d, i) => {
+      const label = d.label || `Audio Input ${i + 1}`;
+      const { type, name } = this.getDeviceType(label);
+      const shortLabel = label.replace(/\(.*?\)/g, '').trim() || label;
+      return `
+        <div class="device-card" id="dcard-${d.deviceId.substring(0,8)}" data-id="${d.deviceId}" data-label="${label}">
+          <div class="device-header">
+            <div class="device-check" onclick="REC.toggleDevice('${d.deviceId}','${label.replace(/'/g,"\\'")}',this)">
+              <div class="device-check-dot"></div>
+            </div>
+            <div class="device-name">${shortLabel}</div>
+            <div class="device-type ${type}">${name}</div>
+          </div>
+          <div class="gain-row">
+            <div class="gain-label">Gain L</div>
+            <input type="range" class="gain-slider" id="gain-l-${d.deviceId.substring(0,8)}"
+              min="0" max="200" value="80"
+              oninput="REC.setGain('l',this.value/100,'${d.deviceId.substring(0,8)}')">
+            <div class="gain-val" id="gainval-l-${d.deviceId.substring(0,8)}">0 dB</div>
+          </div>
+          <div class="gain-row">
+            <div class="gain-label">Gain R</div>
+            <input type="range" class="gain-slider" id="gain-r-${d.deviceId.substring(0,8)}"
+              min="0" max="200" value="80"
+              oninput="REC.setGain('r',this.value/100,'${d.deviceId.substring(0,8)}')">
+            <div class="gain-val" id="gainval-r-${d.deviceId.substring(0,8)}">0 dB</div>
+          </div>
+          <div class="device-options">
+            <button class="opt-btn active" onclick="REC.toggleOpt(this,'stereo')">Stereo</button>
+            <button class="opt-btn" onclick="REC.toggleOpt(this,'mono')">Mono</button>
+            <button class="opt-btn" onclick="REC.toggleOpt(this,'locut')">Lo-cut 80Hz</button>
+            <button class="opt-btn" onclick="REC.toggleOpt(this,'phase')">Ø Phase</button>
+          </div>
+        </div>`;
+    }).join('');
+  },
+
+  toggleOpt(btn, opt) {
+    btn.classList.toggle('active');
+  },
+
+  setGain(ch, val, shortId) {
+    const db = val === 0 ? '-∞' : (20 * Math.log10(val)).toFixed(1);
+    $(`gainval-${ch}-${shortId}`).textContent = val === 0 ? '-∞ dB' : `${db > 0 ? '+' : ''}${db} dB`;
+    if (ch === 'l') this.gainL = val;
+    else this.gainR = val;
+    if (this.gainNode) this.gainNode.gain.value = (this.gainL + this.gainR) / 2;
+  },
+
+  async toggleDevice(deviceId, label, checkEl) {
+    const card = checkEl.closest('.device-card');
+    if (card.classList.contains('selected')) {
+      card.classList.remove('selected');
+      this.selectedDeviceId = null;
+      this.stopAudioMonitor();
+      $('rec-btn').disabled = true;
+      $('rec-status').textContent = 'Select an audio input to begin';
+      $('live-wave-device').textContent = 'No device selected';
+      $('vu-meters').innerHTML = '<div style="font-family:var(--fm);font-size:.7rem;color:var(--subtle)">Select an input device to see levels</div>';
+    } else {
+      document.querySelectorAll('.device-card.selected').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      this.selectedDeviceId = deviceId;
+      await this.startAudioMonitor(deviceId, label);
+      $('rec-btn').disabled = false;
+      $('rec-status').textContent = `${label.split('(')[0].trim()} ready — hit record`;
+      $('live-wave-device').textContent = label.split('(')[0].trim() || label;
+    }
+  },
+
+  // ── Audio monitoring ─────────────────────────────────────────
+  async startAudioMonitor(deviceId, label) {
+    try {
+      if (this.audioCtx) { this.audioCtx.close(); }
+      this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 44100,
+        }
+      });
+      this.audioStream = stream;
+      const src = this.audioCtx.createMediaStreamSource(stream);
+      this.gainNode = this.audioCtx.createGain();
+      this.gainNode.gain.value = (this.gainL + this.gainR) / 2;
+      const splitter = this.audioCtx.createChannelSplitter(2);
+      this.analyserL = this.audioCtx.createAnalyser();
+      this.analyserR = this.audioCtx.createAnalyser();
+      this.analyserL.fftSize = 2048;
+      this.analyserR.fftSize = 2048;
+      src.connect(this.gainNode);
+      this.gainNode.connect(splitter);
+      splitter.connect(this.analyserL, 0);
+      splitter.connect(this.analyserR, 1);
+      this.renderVUMeters(label);
+      this.startVUAnimation();
+    } catch(e) {
+      toast('Audio error: ' + e.message);
+    }
+  },
+
+  stopAudioMonitor() {
+    cancelAnimationFrame(this.vuFrame);
+    this.audioStream?.getTracks().forEach(t => t.stop());
+    this.audioCtx?.close();
+    this.audioCtx = null;
+    this.analyserL = null;
+    this.analyserR = null;
+  },
+
+  renderVUMeters(label) {
+    $('vu-meters').innerHTML = `
+      <div class="vu-pro">
+        <div class="vu-pro-header">
+          <div class="vu-pro-name">${label.split('(')[0].trim()}</div>
+          <div style="font-family:var(--fm);font-size:.6rem;color:var(--subtle)" id="vu-rms-display">RMS: — dB</div>
+        </div>
+        <div class="vu-pro-row">
+          <div class="vu-pro-ch">L</div>
+          <div class="vu-pro-track">
+            <div class="vu-pro-rms" id="vu-rms-l"></div>
+            <div class="vu-pro-peak-hold" id="vu-peak-l"></div>
+          </div>
+          <div class="vu-pro-clip" id="vu-clip-l" onclick="REC.resetClip('l')" title="Click to reset"></div>
+          <div class="vu-pro-db" id="vu-db-l">—</div>
+        </div>
+        <div class="vu-pro-row">
+          <div class="vu-pro-ch">R</div>
+          <div class="vu-pro-track">
+            <div class="vu-pro-rms" id="vu-rms-r"></div>
+            <div class="vu-pro-peak-hold" id="vu-peak-r"></div>
+          </div>
+          <div class="vu-pro-clip" id="vu-clip-r" onclick="REC.resetClip('r')" title="Click to reset"></div>
+          <div class="vu-pro-db" id="vu-db-r">—</div>
+        </div>
+      </div>`;
+  },
+
+  getRMS(analyser) {
+    if (!analyser) return 0;
+    const data = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    return Math.sqrt(sum / data.length);
+  },
+
+  getPeak(analyser) {
+    if (!analyser) return 0;
+    const data = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(data);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) { const v = Math.abs(data[i]); if (v > peak) peak = v; }
+    return peak;
+  },
+
+  toDBFS(linear) {
+    if (linear <= 0) return -Infinity;
+    return 20 * Math.log10(linear);
+  },
+
+  linearToPercent(linear) {
+    // Map -60dBFS to 0dBFS → 0% to 100%
+    const db = this.toDBFS(linear);
+    if (db <= -60) return 0;
+    if (db >= 0) return 100;
+    return ((db + 60) / 60) * 100;
+  },
+
+  startVUAnimation() {
+    cancelAnimationFrame(this.vuFrame);
+    const draw = () => {
+      this.vuFrame = requestAnimationFrame(draw);
+      if (!this.analyserL) return;
+      const rmsL = this.getRMS(this.analyserL);
+      const rmsR = this.getRMS(this.analyserR || this.analyserL);
+      const peakL = this.getPeak(this.analyserL);
+      const peakR = this.getPeak(this.analyserR || this.analyserL);
+      const pctL = this.linearToPercent(rmsL);
+      const pctR = this.linearToPercent(rmsR);
+      const ppL = this.linearToPercent(peakL);
+      const ppR = this.linearToPercent(peakR);
+      // RMS bars
+      const rmsLEl = $('vu-rms-l'); if (rmsLEl) rmsLEl.style.width = pctL + '%';
+      const rmsREl = $('vu-rms-r'); if (rmsREl) rmsREl.style.width = pctR + '%';
+      // Peak hold
+      if (ppL > this.peakHoldL) { this.peakHoldL = ppL; clearTimeout(this.peakTimerL); this.peakTimerL = setTimeout(() => { this.peakHoldL = 0; }, 1800); }
+      if (ppR > this.peakHoldR) { this.peakHoldR = ppR; clearTimeout(this.peakTimerR); this.peakTimerR = setTimeout(() => { this.peakHoldR = 0; }, 1800); }
+      const phL = $('vu-peak-l'); if (phL) phL.style.left = this.peakHoldL + '%';
+      const phR = $('vu-peak-r'); if (phR) phR.style.left = this.peakHoldR + '%';
+      // dB readout
+      const dbL = this.toDBFS(rmsL);
+      const dbR = this.toDBFS(rmsR);
+      const dbLEl = $('vu-db-l'); if (dbLEl) dbLEl.textContent = isFinite(dbL) ? dbL.toFixed(1) + ' dB' : '-∞';
+      const dbREl = $('vu-db-r'); if (dbREl) dbREl.textContent = isFinite(dbR) ? dbR.toFixed(1) + ' dB' : '-∞';
+      const rmsDisp = $('vu-rms-display'); if (rmsDisp) rmsDisp.textContent = `RMS: ${isFinite(dbL) ? dbL.toFixed(1) : '-∞'} dBFS`;
+      // Clip detect
+      if (peakL >= 0.99 && !this.clippedL) { this.clippedL = true; const cl = $('vu-clip-l'); if (cl) cl.classList.add('clipping'); }
+      if (peakR >= 0.99 && !this.clippedR) { this.clippedR = true; const cr = $('vu-clip-r'); if (cr) cr.classList.add('clipping'); }
+    };
+    draw();
+  },
+
+  resetClip(ch) {
+    if (ch === 'l') { this.clippedL = false; $('vu-clip-l')?.classList.remove('clipping'); }
+    else { this.clippedR = false; $('vu-clip-r')?.classList.remove('clipping'); }
+  },
+
+  // ── Auto-gain ────────────────────────────────────────────────
+  async autoGain() {
+    if (!this.analyserL) { toast('Select an audio device first'); return; }
+    const btn = $('autogain-btn');
+    btn.classList.add('running');
+    btn.textContent = '⟳ Analysing 5s...';
+    const TARGET_DBFS = -18;
+    const samples = [];
+    const startTime = Date.now();
+    await new Promise(resolve => {
+      const collect = () => {
+        if (Date.now() - startTime > 5000) { resolve(); return; }
+        samples.push(this.getRMS(this.analyserL));
+        requestAnimationFrame(collect);
+      };
+      collect();
+    });
+    const avgRMS = samples.reduce((a, b) => a + b, 0) / samples.length;
+    const currentDB = this.toDBFS(avgRMS);
+    const diff = TARGET_DBFS - currentDB;
+    const newGain = Math.min(4, Math.max(0.1, this.gainL * Math.pow(10, diff / 20)));
+    this.gainL = newGain;
+    this.gainR = newGain;
+    if (this.gainNode) this.gainNode.gain.value = newGain;
+    const shortId = this.selectedDeviceId?.substring(0, 8);
+    const sliderVal = Math.round(newGain * 100);
+    const glEl = $(`gain-l-${shortId}`); if (glEl) glEl.value = Math.min(200, sliderVal);
+    const grEl = $(`gain-r-${shortId}`); if (grEl) grEl.value = Math.min(200, sliderVal);
+    const db = (20 * Math.log10(newGain)).toFixed(1);
+    const glv = $(`gainval-l-${shortId}`); if (glv) glv.textContent = `${db > 0 ? '+' : ''}${db} dB`;
+    const grv = $(`gainval-r-${shortId}`); if (grv) grv.textContent = `${db > 0 ? '+' : ''}${db} dB`;
+    btn.classList.remove('running');
+    btn.textContent = `⚡ Auto-gain`;
+    toast(`Gain set to ${db > 0 ? '+' : ''}${db} dB (target -18 dBFS)`);
+  },
+
+  // ── Live waveform ────────────────────────────────────────────
+  startLiveWave() {
+    const canvas = $('live-wave-canvas');
+    if (!canvas) return;
+    const drawWave = () => {
+      this.waveFrame = requestAnimationFrame(drawWave);
+      const W = canvas.offsetWidth || 600;
+      const H = 48;
+      if (canvas.width !== W) canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'var(--panel2)';
+      ctx.fillStyle = '#1E2338';
+      ctx.fillRect(0, 0, W, H);
+      if (!this.analyserL) {
+        ctx.fillStyle = '#252B42';
+        ctx.fillRect(0, H / 2 - 1, W, 2);
+        return;
+      }
+      const data = new Float32Array(this.analyserL.fftSize);
+      this.analyserL.getFloatTimeDomainData(data);
+      const step = Math.ceil(data.length / W);
+      ctx.strokeStyle = '#F0A030';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < W; i++) {
+        let max = 0;
+        for (let j = 0; j < step; j++) { const v = data[i * step + j] || 0; if (Math.abs(v) > Math.abs(max)) max = v; }
+        const y = ((1 - max) / 2) * H;
+        if (i === 0) ctx.moveTo(i, y); else ctx.lineTo(i, y);
+      }
+      ctx.stroke();
+    };
+    drawWave();
+  },
+
+  // ── Camera ───────────────────────────────────────────────────
+  async startWebcam(deviceId) {
+    try {
+      if (this.videoStream) this.videoStream.getTracks().forEach(t => t.stop());
+      this.videoStream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      const v = $('webcam-video');
+      v.srcObject = this.videoStream;
+      $('webcam-overlay').style.display = 'none';
+      $('webcam-status').className = 'cam-tile-status live';
+    } catch(e) {
+      toast('Camera error: ' + e.message);
+    }
+  },
+
+  renderVideoDevices(devices) {
+    const sel = $('webcam-select');
+    if (!devices.length) { sel.innerHTML = '<option value="">No cameras found</option>'; return; }
+    sel.innerHTML = devices.map(d => `<option value="${d.deviceId}">${d.label || 'Camera'}</option>`).join('');
+    const obs = devices.find(d => d.label.toLowerCase().includes('obs') || d.label.toLowerCase().includes('virtual'));
+    if (obs) sel.value = obs.deviceId;
+  },
+
+  setActiveCamera(id, tile) {
+    document.querySelectorAll('.cam-tile').forEach(t => {
+      t.classList.remove('active-cam');
+      const badge = t.querySelector('.cam-tile-badge');
+      if (badge && badge.textContent === 'ACTIVE') badge.remove();
+    });
+    tile.classList.add('active-cam');
+    if (!tile.querySelector('.cam-tile-badge')) {
+      const b = document.createElement('div');
+      b.className = 'cam-tile-badge'; b.textContent = 'ACTIVE';
+      tile.appendChild(b);
+    }
+    this.activeCamId = id;
+  },
+
+  renameCamera(id) {
+    const label = id === 'webcam' ? $('webcam-label') : $(`phone-label-${id}`);
+    if (!label) return;
+    const current = label.textContent;
+    const newName = prompt('Camera label:', current);
+    if (newName) label.textContent = newName;
+  },
+
+  // ── WebRTC signalling ────────────────────────────────────────
+  // Uses local test server (ws://LOCAL_IP:3001) or Render in production
+  get wsUrl() {
+    return window.RISYNC_WS || S.BACKEND.replace('http','ws').replace('https','wss');
+  },
+
+  get apiBase() {
+    return window.RISYNC_API || S.BACKEND;
+  },
+
+  connectSignalling() {
+    if (this.sigWS && this.sigWS.readyState === WebSocket.OPEN) return;
+    try {
+      this.sigWS = new WebSocket(this.wsUrl);
+      this.sigWS.onopen = () => {
+        console.log('[RISYNC] Signalling connected');
+        // Create room with current code
+        if (this._pendingRoomCode) {
+          this.sigWS.send(JSON.stringify({ type:'create-room', roomCode: this._pendingRoomCode }));
+        }
+      };
+      this.sigWS.onmessage = e => this.handleSignal(JSON.parse(e.data));
+      this.sigWS.onerror = () => console.warn('[RISYNC] Signalling WS error — is local server running?');
+      this.sigWS.onclose = () => {
+        console.log('[RISYNC] Signalling disconnected');
+        // Retry after 3s
+        setTimeout(() => { if (this._pendingRoomCode) this.connectSignalling(); }, 3000);
+      };
+    } catch(e) {
+      console.warn('[RISYNC] Cannot connect to signalling server:', e.message);
+    }
+  },
+
+  sigSend(msg) {
+    if (this.sigWS?.readyState === WebSocket.OPEN) {
+      this.sigWS.send(JSON.stringify(msg));
+    }
+  },
+
+  async handleSignal(msg) {
+    switch(msg.type) {
+
+      case 'connected':
+        this.studioPeerId = msg.peerId;
+        // Now create the room
+        this.sigSend({ type:'create-room', roomCode: this._pendingRoomCode });
+        break;
+
+      case 'room-created':
+        console.log('[RISYNC] Room ready:', msg.roomCode);
+        // Update QR with confirmed URL
+        if (msg.joinUrl) {
+          $('qr-url-text').textContent = msg.joinUrl;
+          this.drawQR(msg.roomCode, msg.joinUrl);
+          $('copy-qr-link-btn').onclick = () => {
+            navigator.clipboard.writeText(msg.joinUrl);
+            toast('Link copied!');
+          };
+        }
+        break;
+
+      case 'peer-joined':
+        console.log('[RISYNC] Phone joined:', msg.peerId, msg.name);
+        toast(`${msg.name || 'Phone'} connected — establishing video...`);
+        this.addPhoneCamera(msg.peerId, msg.name || 'Phone');
+        // Studio initiates the WebRTC offer to the phone
+        await this.createPhonePeerConn(msg.peerId, true);
+        break;
+
+      case 'peer-left':
+        this.removePhone(msg.peerId);
+        toast('Phone camera disconnected');
+        break;
+
+      case 'offer':
+        await this.handlePhoneOffer(msg.fromPeerId, msg.sdp);
+        break;
+
+      case 'answer':
+        await this.phonePeers.get(msg.fromPeerId)?.setRemoteDescription({type:'answer', sdp:msg.sdp});
+        break;
+
+      case 'ice-candidate':
+        if (msg.candidate) {
+          await this.phonePeers.get(msg.fromPeerId)?.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        }
+        break;
+
+      case 'error':
+        toast('Signalling error: ' + msg.message);
+        break;
+    }
+  },
+
+  // ── WebRTC peer connections ──────────────────────────────────
+  async createPhonePeerConn(peerId, initiate) {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ]
+    });
+    this.phonePeers.set(peerId, pc);
+
+    pc.onicecandidate = e => {
+      if (e.candidate) {
+        this.sigSend({ type:'ice-candidate', candidate: e.candidate, fromPeerId: this.studioPeerId });
+      }
+    };
+
+    pc.ontrack = e => {
+      console.log('[RISYNC] Got track from phone:', e.track.kind);
+      if (e.track.kind === 'video') {
+        this.attachPhoneVideo(peerId, e.streams[0]);
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('[RISYNC] PC state:', pc.connectionState, 'for', peerId);
+      const status = $(`phone-status-${peerId}`);
+      const conn   = $(`phone-conn-${peerId}`);
+      if (pc.connectionState === 'connected') {
+        if (status) { status.className = 'cam-tile-status live'; }
+        if (conn)   { conn.style.display = 'none'; }
+        toast('Phone camera live!');
+      }
+      if (pc.connectionState === 'failed') {
+        if (status) status.className = 'cam-tile-status';
+        toast('Phone connection failed — try again');
+      }
+    };
+
+    if (initiate) {
+      const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+      await pc.setLocalDescription(offer);
+      this.sigSend({ type:'offer', sdp: offer.sdp, fromPeerId: this.studioPeerId });
+    }
+    return pc;
+  },
+
+  async handlePhoneOffer(fromPeerId, sdp) {
+    const pc = await this.createPhonePeerConn(fromPeerId, false);
+    await pc.setRemoteDescription({ type:'offer', sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    this.sigSend({ type:'answer', sdp: answer.sdp, fromPeerId: this.studioPeerId });
+  },
+
+  attachPhoneVideo(peerId, stream) {
+    const overlay = $(`phone-overlay-${peerId}`);
+    if (overlay) overlay.style.display = 'none';
+    // Create or find video element in tile
+    let vid = $(`phone-vid-${peerId}`);
+    if (!vid) {
+      const tile = $(`cam-tile-${peerId}`);
+      if (!tile) return;
+      vid = document.createElement('video');
+      vid.id = `phone-vid-${peerId}`;
+      vid.autoplay = true;
+      vid.playsinline = true;
+      vid.muted = true;
+      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+      tile.insertBefore(vid, tile.firstChild);
+    }
+    vid.srcObject = stream;
+  },
+
+  // ── QR code + room ───────────────────────────────────────────
+  openQR() {
+    // Generate room code
+    const roomCode = 'RS' + Math.random().toString(36).substring(2,6).toUpperCase();
+    this._pendingRoomCode = roomCode;
+    this.phonePeers = this.phonePeers || new Map();
+
+    // Build join URL using local server IP if available
+    const host  = window.RISYNC_HOST || window.location.hostname;
+    const port  = window.RISYNC_PORT || '';
+    const portStr = port && port !== 80 && port !== 443 ? ':' + port : '';
+    const joinUrl = `http://${host}${portStr}/musician-portal.html?room=${roomCode}&ws=${encodeURIComponent(this.wsUrl)}`;
+
+    $('qr-room-code').textContent = roomCode;
+    $('qr-url-text').textContent  = joinUrl;
+    $('copy-qr-link-btn').onclick = () => { navigator.clipboard.writeText(joinUrl); toast('Link copied!'); };
+    this.drawQR(roomCode, joinUrl);
+    $('qr-modal').classList.add('open');
+
+    // Connect to signalling server
+    this.connectSignalling();
+  },
+
+  drawQR(code, url) {
+    // Clear previous QR
+    const wrap = $('qr-canvas');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    // Generate real scannable QR code using qrcode.js
+    try {
+      new QRCode(wrap, {
+        text:           url,
+        width:          180,
+        height:         180,
+        colorDark:      '#080B12',
+        colorLight:     '#ffffff',
+        correctLevel:   QRCode.CorrectLevel.M,
+      });
+    } catch(e) {
+      // Fallback if library not loaded — show URL as text
+      wrap.innerHTML = `<div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle);padding:10px;word-break:break-all;max-width:180px">${url}</div>`;
+    }
+  },
+
+  addPhoneCamera(peerId, name) {
+    this.phoneCount++;
+    const grid    = $('cam-grid');
+    const addTile = $('add-phone-tile');
+    const tile    = document.createElement('div');
+    tile.className = 'cam-tile';
+    tile.id = `cam-tile-${peerId}`;
+    tile.onclick = () => this.setActiveCamera(peerId, tile);
+    tile.innerHTML = `
+      <div class="cam-tile-overlay" id="phone-overlay-${peerId}" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:2;background:var(--panel2)">
+        <div style="font-size:1.6rem">📱</div>
+        <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)" id="phone-conn-${peerId}">Connecting...</div>
+        <div style="font-family:var(--fm);font-size:.58rem;color:var(--muted)">WebRTC P2P</div>
+      </div>
+      <div class="cam-tile-label" id="phone-label-${peerId}">${name || 'Phone ' + this.phoneCount}</div>
+      <div class="cam-tile-status waiting" id="phone-status-${peerId}"></div>
+      <div class="cam-tile-controls">
+        <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.sendFlip('${peerId}')" title="Flip camera">⟳</button>
+        <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.renameCamera('${peerId}')" title="Rename">✏</button>
+        <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.removePhone('${peerId}')" title="Remove" style="color:#E04858">✕</button>
+      </div>`;
+    grid.insertBefore(tile, addTile);
+    this.phoneCams.set(peerId, { tile, connected: false });
+  },
+
+  sendFlip(peerId) {
+    this.sigSend({ type:'flip-camera', targetPeerId: peerId });
+    toast('Flip sent to phone');
+  },
+
+  removePhone(peerId) {
+    $(`cam-tile-${peerId}`)?.remove();
+    this.phonePeers?.get(peerId)?.close();
+    this.phonePeers?.delete(peerId);
+    this.phoneCams.delete(peerId);
+    toast('Phone camera removed');
+  },
+
+  // ── Recording ────────────────────────────────────────────────
+  async startRecording() {
+    if (!this.selectedDeviceId) { toast('Select an audio input first'); return; }
+    try {
+      const audioTracks = this.audioStream?.getTracks().filter(t => t.kind === 'audio') || [];
+      const videoTracks = this.videoStream?.getTracks().filter(t => t.kind === 'video') || [];
+      const allTracks = [...audioTracks, ...videoTracks];
+      if (!allTracks.length) { toast('No audio or video tracks available'); return; }
+      this.mixedStream = new MediaStream(allTracks);
+      const chunks = [];
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+        ? 'video/webm;codecs=vp8,opus'
+        : 'video/webm';
+      this.mediaRecorder = new MediaRecorder(this.mixedStream, { mimeType, videoBitsPerSecond: 5000000, audioBitsPerSecond: 256000 });
+      this.mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      this.mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        this.saveTake(blob);
+      };
+      this.mediaRecorder.start(100);
+      this.recStartTime = Date.now();
+      this.paused = false;
+      this.recInterval = setInterval(() => this.updateTimer(), 500);
+      $('rec-btn').classList.add('recording');
+      $('rec-status').textContent = 'Recording...';
+      $('stop-btn').disabled = false;
+      $('pause-btn').disabled = false;
+      $('discard-btn').disabled = false;
+      $('rec-btn').disabled = true;
+      $('rec-indicator').classList.add('live');
+      $('rec-status-text').textContent = 'REC';
+      toast('Recording started');
+    } catch(e) { toast('Recording error: ' + e.message); console.error(e); }
+  },
+
+  pauseRecording() {
+    if (!this.mediaRecorder) return;
+    if (this.paused) {
+      this.mediaRecorder.resume();
+      this.paused = false;
+      $('pause-btn').textContent = '⏸ Pause';
+      $('rec-status').textContent = 'Recording...';
+      this.recStartTime = Date.now() - this._pausedAt;
+    } else {
+      this.mediaRecorder.pause();
+      this.paused = true;
+      this._pausedAt = Date.now() - this.recStartTime;
+      $('pause-btn').textContent = '▶ Resume';
+      $('rec-status').textContent = 'Paused';
+    }
+  },
+
+  stopRecording() {
+    if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') return;
+    this.mediaRecorder.stop();
+    clearInterval(this.recInterval);
+    $('rec-btn').classList.remove('recording');
+    $('rec-btn').disabled = false;
+    $('stop-btn').disabled = true;
+    $('pause-btn').disabled = true;
+    $('discard-btn').disabled = true;
+    $('rec-status').textContent = 'Take saved';
+    $('rec-indicator').classList.remove('live');
+    $('rec-indicator').classList.add('ready');
+    $('rec-status-text').textContent = 'Ready';
+  },
+
+  discardRecording() {
+    if (this.mediaRecorder?.state !== 'inactive') {
+      this.mediaRecorder.ondataavailable = null;
+      this.mediaRecorder.onstop = null;
+      this.mediaRecorder.stop();
+    }
+    clearInterval(this.recInterval);
+    $('rec-timer').textContent = '0:00:00';
+    $('rec-btn').classList.remove('recording');
+    $('rec-btn').disabled = false;
+    $('stop-btn').disabled = true;
+    $('pause-btn').disabled = true;
+    $('discard-btn').disabled = true;
+    $('rec-status').textContent = 'Discarded — ready to record again';
+    toast('Take discarded');
+  },
+
+  updateTimer() {
+    if (this.paused) return;
+    const elapsed = (Date.now() - this.recStartTime) / 1000;
+    $('rec-timer').textContent = fmtH(elapsed);
+  },
+
+  // ── Takes ────────────────────────────────────────────────────
+  saveTake(blob) {
+    this.takeCount++;
+    const dur = (Date.now() - this.recStartTime) / 1000;
+    const take = { id: this.takeCount, blob, url: URL.createObjectURL(blob), duration: dur, note: '', best: false };
+    this.takes.push(take);
+    this.renderTakes();
+    S.vocalStemBlob = blob;
+    S.visyncVideoFile = blob;
+    toast(`Take ${this.takeCount} saved — ${fmt(dur)}`);
+  },
+
+  renderTakes() {
+    const list = $('takes-list');
+    $('takes-count').textContent = `${this.takes.length} take${this.takes.length !== 1 ? 's' : ''}`;
+    if (!this.takes.length) {
+      list.innerHTML = `<div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle);padding:14px;text-align:center;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r)">No takes yet — hit record to start</div>`;
+      return;
+    }
+    list.innerHTML = this.takes.map(t => `
+      <div class="take-row ${t.best ? 'best-take' : ''}" id="take-row-${t.id}">
+        <div class="take-num">Take ${t.id}</div>
+        <div class="take-dur">${fmt(t.duration)}</div>
+        <input class="take-note" placeholder="Add note..." value="${t.note}"
+          oninput="REC.updateTakeNote(${t.id},this.value)">
+        <div class="take-btns">
+          <button class="take-btn" onclick="REC.previewTake(${t.id})" title="Preview">▶</button>
+          <button class="take-btn" onclick="REC.trimTakeOpen(${t.id})" title="Trim">✂</button>
+          <button class="take-btn use ${t.best ? 'active' : ''}" onclick="REC.useTake(${t.id})" title="Use this take">✓</button>
+          <button class="take-btn del" onclick="REC.deleteTake(${t.id})" title="Delete">✕</button>
+        </div>
+      </div>`).join('');
+  },
+
+  updateTakeNote(id, note) { const t = this.takes.find(x => x.id === id); if (t) t.note = note; },
+
+  previewTake(id) {
+    const t = this.takes.find(x => x.id === id);
+    if (!t) return;
+    const v = $('webcam-video');
+    v.srcObject = null; v.src = t.url; v.play();
+    toast('Previewing take ' + id + ' — click the webcam tile to go back live');
+  },
+
+  useTake(id) {
+    this.takes.forEach(t => t.best = t.id === id);
+    this.renderTakes();
+    const t = this.takes.find(x => x.id === id);
+    if (t) { S.vocalStemBlob = t.blob; S.visyncVideoFile = t.blob; loadBlobToStudio(t.blob); }
+    toast(`Take ${id} set as active — go to Studio Mix`);
+  },
+
+  deleteTake(id) {
+    this.takes = this.takes.filter(t => t.id !== id);
+    this.renderTakes();
+    toast('Take deleted');
+  },
+
+  // ── Trim ─────────────────────────────────────────────────────
+  trimTakeOpen(id) {
+    const t = this.takes.find(x => x.id === id);
+    if (!t) return;
+    this.trimTake = t;
+    $('trim-modal').classList.add('open');
+    $('trim-in').value = 0;
+    $('trim-out').value = 100;
+    $('trim-in-val').textContent = '0:00';
+    $('trim-out-val').textContent = fmt(t.duration);
+    const canvas = $('trim-wave');
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1E2338'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#F0A03060';
+    for (let i = 0; i < canvas.width; i++) {
+      const h = Math.random() * canvas.height * 0.8;
+      ctx.fillRect(i, (canvas.height - h) / 2, 1, h);
+    }
+  },
+
+  // ── MIDI ────────────────────────────────────────────────────
+  async initMIDI() {
+    $('midi-status').textContent = 'Scanning...';
+    if (!navigator.requestMIDIAccess) { $('midi-status').textContent = 'MIDI not supported'; return; }
+    try {
+      this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+      const inputs = [...this.midiAccess.inputs.values()];
+      if (!inputs.length) { $('midi-status').textContent = 'No MIDI devices'; return; }
+      // Prefer RC-10, Boss, or looper — otherwise use first device
+      const pref = inputs.find(i => /rc.?10|boss|looper/i.test(i.name)) || inputs[0];
+      $('midi-status').textContent = '● Connected';
+      $('midi-device-name').textContent = pref.name;
+      pref.onmidimessage = e => this.onMIDI(e);
+      toast('MIDI: ' + pref.name);
+    } catch(e) { $('midi-status').textContent = 'MIDI access denied'; }
+  },
+
+  onMIDI(msg) {
+    const [status] = msg.data;
+    if (status === 0xF8) { // MIDI clock (24 per beat)
+      const now = performance.now();
+      if (this.lastMidiClock) { this.midiClockTimes.push(now - this.lastMidiClock); if (this.midiClockTimes.length > 48) this.midiClockTimes.shift(); }
+      this.lastMidiClock = now;
+      this.midiClockCount++;
+      if (this.midiClockCount % 24 === 0) {
+        const beat = Math.floor(this.midiClockCount / 24);
+        this.loopBeat = (beat % this.loopBeats);
+        this.loopBar = Math.floor(beat / 4);
+        if (this.midiClockTimes.length > 2) {
+          const avg = this.midiClockTimes.slice(-24).reduce((a, b) => a + b, 0) / Math.min(24, this.midiClockTimes.length);
+          this.loopBPM = Math.round(60000 / (avg * 24));
+        }
+        $('loop-bpm').textContent = this.loopBPM || '—';
+        $('loop-bar').textContent = (this.loopBar % 99) + 1;
+        $('loop-beat-disp').textContent = (this.loopBeat % 4) + 1 + ' / 4';
+        this.updateBeatGrid(this.loopBeat);
+      }
+    }
+    if (status === 0xFA) { this.midiClockCount = 0; $('loop-bar').textContent = '1'; } // Start
+    if (status === 0xFC) { $('loop-bpm').textContent = '—'; } // Stop
+  },
+
+  buildBeatGrid(n) {
+    $('loop-grid').innerHTML = Array.from({ length: n }, (_, i) =>
+      `<div class="beat-cell ${i % 4 === 0 ? 'bar-start' : ''}" id="bc-${i}"></div>`
+    ).join('');
+  },
+
+  updateBeatGrid(beat) {
+    document.querySelectorAll('.beat-cell').forEach((el, i) => {
+      el.classList.toggle('on', i < beat);
+      el.classList.toggle('now', i === beat);
+    });
+  },
+
+  // ── Tap tempo ────────────────────────────────────────────────
+  tap() {
+    const now = Date.now();
+    this.tapTimes.push(now);
+    if (this.tapTimes.length > 8) this.tapTimes.shift();
+    if (this.tapTimes.length >= 2) {
+      const gaps = [];
+      for (let i = 1; i < this.tapTimes.length; i++) gaps.push(this.tapTimes[i] - this.tapTimes[i - 1]);
+      const avg = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+      const bpm = Math.round(60000 / avg);
+      this.manualBPM = bpm;
+      $('manual-bpm').value = bpm;
+      $('loop-bpm').textContent = bpm;
+    }
+  },
+
+  // ── Events ───────────────────────────────────────────────────
+  bindEvents() {
+    $('rec-btn').addEventListener('click', () => this.startRecording());
+    $('stop-btn').addEventListener('click', () => this.stopRecording());
+    $('pause-btn').addEventListener('click', () => this.pauseRecording());
+    $('discard-btn').addEventListener('click', () => this.discardRecording());
+    $('autogain-btn').addEventListener('click', () => this.autoGain());
+    $('refresh-inputs-btn').addEventListener('click', () => this.enumDevices());
+    $('refresh-cams-btn').addEventListener('click', () => this.enumDevices());
+    $('switch-cam-btn').addEventListener('click', () => this.startWebcam($('webcam-select').value));
+    $('tap-btn').addEventListener('click', () => this.tap());
+    $('manual-bpm').addEventListener('change', e => { this.manualBPM = parseInt(e.target.value); $('loop-bpm').textContent = this.manualBPM; });
+    $('close-qr-btn').addEventListener('click', () => $('qr-modal').classList.remove('open'));
+    $('trim-cancel-btn').addEventListener('click', () => $('trim-modal').classList.remove('open'));
+    $('trim-apply-btn').addEventListener('click', () => { $('trim-modal').classList.remove('open'); toast('Trim applied to take'); });
+    $('trim-in').addEventListener('input', e => { if (this.trimTake) $('trim-in-val').textContent = fmt(this.trimTake.duration * e.target.value / 100); });
+    $('trim-out').addEventListener('input', e => { if (this.trimTake) $('trim-out-val').textContent = fmt(this.trimTake.duration * e.target.value / 100); });
+    $('trim-play-btn').addEventListener('click', () => { if (this.trimTake) { const a = new Audio(this.trimTake.url); a.play(); } });
+  },
+};
+
+// Boot record tab
+REC.init();
+
+// STUDIO MIX
+// ══════════════════════════════════════════════════════════════
+$('import-drop').addEventListener('dragover',e=>{e.preventDefault();$('import-drop').classList.add('drag-over')});
+$('import-drop').addEventListener('dragleave',()=>$('import-drop').classList.remove('drag-over'));
+$('import-drop').addEventListener('drop',e=>{e.preventDefault();$('import-drop').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)loadFileToStudio(f)});
+$('import-file').addEventListener('change',e=>{if(e.target.files[0])loadFileToStudio(e.target.files[0])});
+
+async function loadFileToStudio(file){
+  S.audioFile = file;
+  const url = URL.createObjectURL(file);
+  const r = new FileReader();
+  r.onload = async ev=>{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    try {
+      S.audioBuffer = await ctx.decodeAudioData(ev.target.result);
+      renderStudioStems(file.name);
+      drawWaveformCanvas('master-waveform', S.audioBuffer);
+      $('master-time').textContent = '0:00 / '+fmt(S.audioBuffer.duration);
+      $('export-mix-btn').disabled = false;
+      toast('Track loaded: '+file.name);
+    } catch(e){ toast('Could not decode audio'); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+async function loadBlobToStudio(blob){
+  const file = new File([blob],'take.webm',{type:'video/webm'});
+  loadFileToStudio(file);
+}
+
+function renderStudioStems(filename){
+  // Create stems UI — in a full build these would be real separated stems via Colab
+  const stemDefs = [
+    {name:'Vocals', color:'#8060E0', meta:'From your take'},
+    {name:'Instruments', color:'#F0A030', meta:'From your take'},
+  ];
+  $('stem-tracks').innerHTML = stemDefs.map((s,i)=>`
+    <div class="stem-track mt12">
+      <div class="stem-color" style="background:${s.color}"></div>
+      <div class="stem-info">
+        <div class="stem-name">${s.name}</div>
+        <div class="stem-meta">${s.meta}</div>
+      </div>
+      <div class="stem-wave">
+        <canvas class="waveform-canvas" id="stem-wave-${i}" style="height:36px"></canvas>
+      </div>
+      <div class="stem-controls">
+        <input type="range" class="vol-slider" value="80" min="0" max="100">
+        <button class="mute-btn" onclick="this.classList.toggle('muted')">M</button>
+        <button class="solo-btn" onclick="this.classList.toggle('active')">S</button>
+      </div>
+    </div>
+  `).join('');
+  stemDefs.forEach((_,i)=>{ if(S.audioBuffer) drawWaveformCanvas('stem-wave-'+i, S.audioBuffer, i===0?'#8060E060':'#F0A03060'); });
+  $('send-to-vocal-btn').onclick = ()=>{ document.querySelector('[data-tab=vocal]').click(); toast('Vocal stem ready for processing'); };
+}
+
+$('master-play-btn').addEventListener('click', ()=>{
+  if(!S.audioBuffer) return;
+  if(!S.masterAudio){ S.masterAudio = new Audio(URL.createObjectURL(S.audioFile||new Blob([]))); }
+  S.masterAudio.paused ? S.masterAudio.play() : S.masterAudio.pause();
+  $('master-play-btn').textContent = S.masterAudio.paused ? '▶ Play' : '⏸ Pause';
+});
+
+function drawWaveformCanvas(id, buffer, color='#F0A03060'){
+  const canvas = $(id);
+  if(!canvas||!buffer) return;
+  const W=canvas.offsetWidth||400, H=canvas.offsetHeight||56;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const data=buffer.getChannelData(0);
+  const step=Math.ceil(data.length/W);
+  ctx.fillStyle=color;
+  for(let i=0;i<W;i++){
+    let max=0;
+    for(let j=0;j<step;j++){const v=Math.abs(data[i*step+j]||0);if(v>max)max=v;}
+    const h=max*H*.9;
+    ctx.fillRect(i,(H-h)/2,1,h);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// VOCAL TAB
+// ══════════════════════════════════════════════════════════════
+$('voice-sample-drop').addEventListener('dragover',e=>{e.preventDefault();$('voice-sample-drop').classList.add('drag-over')});
+$('voice-sample-drop').addEventListener('dragleave',()=>$('voice-sample-drop').classList.remove('drag-over'));
+$('voice-sample-drop').addEventListener('drop',e=>{e.preventDefault();$('voice-sample-drop').classList.remove('drag-over');[...e.dataTransfer.files].forEach(addVoiceSample)});
+$('voice-sample-input').addEventListener('change',e=>{[...e.target.files].forEach(addVoiceSample)});
+
+function addVoiceSample(file){
+  S.voiceSampleFiles.push(file);
+  renderVoiceSamples();
+  $('train-rvc-btn').disabled = S.voiceSampleFiles.length === 0;
+}
+
+function renderVoiceSamples(){
+  $('voice-sample-list').style.display='block';
+  $('voice-sample-files').innerHTML = S.voiceSampleFiles.map((f,i)=>
+    `<div style="display:flex;align-items:center;gap:8px">
+      <span style="color:var(--teal)">✓</span>
+      <span>${f.name}</span>
+      <span style="color:var(--subtle)">(${(f.size/1024/1024).toFixed(1)}MB)</span>
+      <button onclick="removeVoiceSample(${i})" style="background:none;border:none;color:var(--subtle);cursor:pointer;font-size:.8rem">✕</button>
+    </div>`
+  ).join('');
+  const totalSize = S.voiceSampleFiles.reduce((a,f)=>a+f.size,0);
+  $('voice-total-dur').textContent = `Total: ~${(totalSize/1024/1024).toFixed(0)} MB`;
+}
+window.removeVoiceSample = i=>{ S.voiceSampleFiles.splice(i,1); renderVoiceSamples(); $('train-rvc-btn').disabled=S.voiceSampleFiles.length===0; };
+
+$('pitch-strength').addEventListener('input',e=>{ $('pitch-val').textContent=e.target.value+'%'; });
+$('reverb-amt').addEventListener('input',e=>{ $('reverb-val').textContent=e.target.value+'%'; });
+
+$('vocal-take-drop').addEventListener('dragover',e=>{e.preventDefault();$('vocal-take-drop').classList.add('drag-over')});
+$('vocal-take-drop').addEventListener('dragleave',()=>$('vocal-take-drop').classList.remove('drag-over'));
+$('vocal-take-drop').addEventListener('drop',e=>{e.preventDefault();$('vocal-take-drop').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f){S.vocalTakeBlob=f;$('process-vocal-btn').disabled=false;toast('Vocal take loaded: '+f.name);}});
+$('vocal-take-input').addEventListener('change',e=>{const f=e.target.files[0];if(f){S.vocalTakeBlob=f;$('process-vocal-btn').disabled=false;toast('Vocal take loaded: '+f.name);}});
+
+$('train-rvc-btn').addEventListener('click', ()=>{
+  const name = $('model-name').value.trim() || 'MyVoice_v1';
+  $('train-progress').style.display='block';
+  $('train-log').innerHTML='';
+  simulateTraining(name);
+});
+
+function simulateTraining(name){
+  const steps=[
+    [5,'Uploading voice samples to Colab...'],
+    [15,'Preprocessing audio (resampling to 40kHz)...'],
+    [28,'Extracting features with HuBERT...'],
+    [42,'Training RVC encoder...'],
+    [58,'Training voice decoder...'],
+    [72,'Fine-tuning pitch predictor...'],
+    [85,'Optimising model weights...'],
+    [95,'Saving model to Google Drive...'],
+    [100,'Model ready!'],
+  ];
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=steps.length){clearInterval(iv);showModelReady(name);return;}
+    const [pct,label]=steps[i];
+    setProgress('train-prog-fill','train-prog-label',pct,label+' '+pct+'%');
+    log('train-log',label);
+    i++;
+  },1600);
+}
+
+function showModelReady(name){
+  S.voiceModelName=name;
+  $('model-ready').style.display='block';
+  $('model-ready-name').textContent=name+' · saved to Google Drive';
+  $('process-vocal-btn').disabled = !S.vocalTakeBlob;
+  toast('Voice model ready: '+name);
+}
+
+$('process-vocal-btn').addEventListener('click',()=>{
+  if(!S.vocalTakeBlob){toast('Load a vocal take first');return;}
+  $('process-progress').style.display='block';
+  $('proc-log').innerHTML='';
+  simulateProcessing();
+});
+
+function simulateProcessing(){
+  const steps=[
+    [10,'Loading vocal take...'],
+    [22,'Detecting pitch (F0 extraction)...'],
+    [38,'Applying RVC voice model...'],
+    [52,'Pitch correction to song key...'],
+    [65,'Beat alignment (nudging timing)...'],
+    [78,'Noise gate applied...'],
+    [88,'Adding reverb...'],
+    [95,'Normalising output...'],
+    [100,'Done!'],
+  ];
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=steps.length){clearInterval(iv);showCompareCard();return;}
+    const [pct,label]=steps[i];
+    setProgress('proc-prog-fill','proc-prog-label',pct,label);
+    log('proc-log',label);
+    i++;
+  },900);
+}
+
+function showCompareCard(){
+  $('compare-card').style.display='block';
+  if(S.audioBuffer){
+    drawWaveformCanvas('orig-wave',S.audioBuffer,'#8060E060');
+    drawWaveformCanvas('proc-wave',S.audioBuffer,'#28B8A060');
+  }
+  toast('Vocal processed — compare and accept');
+}
+
+$('accept-vocal-btn').addEventListener('click',()=>{
+  S.processedVocalBlob = S.vocalTakeBlob; // In real build this is the processed file
+  document.querySelector('[data-tab=studio]').click();
+  toast('Processed vocal accepted — check Studio Mix');
+});
+
+$('reprocess-btn').addEventListener('click',()=>{
+  $('compare-card').style.display='none';
+  $('process-progress').style.display='none';
+  toast('Adjust settings and re-process');
+});
+
+// ══════════════════════════════════════════════════════════════
+// RISYNC TAB
+// ══════════════════════════════════════════════════════════════
+// Audio upload
+$('risync-audio-drop').addEventListener('dragover',e=>{e.preventDefault()});
+$('risync-audio-input').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadRisyncAudio(f)});
+
+async function loadRisyncAudio(file){
+  S.risyncAudioFile = file;
+  const r = new FileReader();
+  r.onload = async ev=>{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    try {
+      S.risyncAudioBuffer = await ctx.decodeAudioData(ev.target.result);
+      buildRisyncSections();
+      $('risync-analyse-btn').disabled = false;
+      $('risync-track-info').innerHTML=`<span style="font-family:var(--fm);font-size:.78rem;color:var(--bright)">${file.name}</span> &nbsp; <span style="color:var(--subtle)">${fmt(S.risyncAudioBuffer.duration)} · ${S.risyncSections.length} scenes</span>`;
+      toast('Track loaded');
+    } catch(e){ toast('Cannot decode audio'); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+// Video upload
+$('risync-video-input').addEventListener('change',e=>{
+  const f=e.target.files[0];
+  if(f){ S.risyncVideoFile=f; $('risync-video-info').textContent='Video loaded: '+f.name; toast('Performance video loaded'); }
+});
+
+function buildRisyncSections(){
+  if(!S.risyncAudioBuffer) return;
+  const clipLen = parseInt($('vs-clip-len')?.value||9);
+  const dur = S.risyncAudioBuffer.duration;
+  const n = Math.ceil(dur/clipLen);
+  const data = S.risyncAudioBuffer.getChannelData(0);
+  const sr = S.risyncAudioBuffer.sampleRate;
+  S.risyncSections = Array.from({length:n},(_,i)=>{
+    const start=i*clipLen, end=Math.min(start+clipLen,dur);
+    const ss=Math.floor(start*sr), es=Math.floor(end*sr);
+    let e=0; for(let j=ss;j<es&&j<data.length;j++) e+=data[j]**2;
+    return {index:i,start,end,energy:Math.min(1,e/(es-ss)*200)};
+  });
+}
+
+$('risync-analyse-btn').addEventListener('click',async()=>{
+  const story = $('risync-storyline').value.trim();
+  if(!story){toast('Add a storyline first');return;}
+  $('risync-analyse-btn').disabled=true;
+  $('risync-analyse-btn').textContent='Analysing...';
+  buildRisyncSections();
+  await analyseRisyncStoryline(story);
+  $('risync-analyse-btn').disabled=false;
+  $('risync-analyse-btn').textContent='Analyse & build scenes →';
+});
+
+async function analyseRisyncStoryline(story){
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:1000,
+        messages:[{role:'user',content:`You are a music video director. Analyse this song storyline and extract creative context.
+
+Storyline: "${story}"
+
+Respond ONLY with valid JSON (no markdown, no backticks):
+{"mood":"2-4 word mood","genre":"genre guess","setting":"primary environment","timeOfDay":"day/night/etc","characters":["char1","char2"],"environments":["env1","env2","env3"],"colorPalette":"2-3 colours","keyMoments":["moment1","moment2","moment3"],"scenePrompts":[${S.risyncSections.map((_,i)=>`"scene ${i+1} prompt"`).join(',')}]}
+
+scenePrompts must have exactly ${S.risyncSections.length} entries, each a vivid 15-word cinematic shot description following the storyline arc.`}]
+      })
+    });
+    const d=await res.json();
+    const text=d.content.find(b=>b.type==='text')?.text||'{}';
+    S.risyncContext=JSON.parse(text.replace(/```json|```/g,'').trim());
+  } catch(e){
+    S.risyncContext={
+      mood:'Atmospheric', genre:'Unknown', setting:'Cinematic world', timeOfDay:'Night',
+      characters:['Protagonist'], environments:['Open landscape','Urban street','Interior'],
+      colorPalette:'Deep blues, warm amber', keyMoments:['Opening','Peak','Resolution'],
+      scenePrompts:S.risyncSections.map((_,i)=>`Scene ${i+1} cinematic visual`)
+    };
+  }
+  renderRisyncResults();
+}
+
+function renderRisyncResults(){
+  const c=S.risyncContext;
+  $('risync-context-grid').style.display='grid';
+  $('risync-context-grid').innerHTML=`
+    <div class="card"><div class="card-title" style="font-size:.8rem">Mood &amp; Tone</div>
+      <div class="tag-list"><span class="tag mood">${c.mood}</span><span class="tag mood">${c.timeOfDay}</span><span class="tag mood">${c.colorPalette}</span></div></div>
+    <div class="card"><div class="card-title" style="font-size:.8rem">Characters</div>
+      <div class="tag-list">${c.characters.map(x=>`<span class="tag char">${x}</span>`).join('')}</div></div>
+    <div class="card"><div class="card-title" style="font-size:.8rem">Environments</div>
+      <div class="tag-list">${c.environments.map(x=>`<span class="tag env">${x}</span>`).join('')}</div></div>
+    <div class="card"><div class="card-title" style="font-size:.8rem">Key Moments</div>
+      ${c.keyMoments.map(m=>`<div style="font-size:.78rem;margin-bottom:3px">· ${m}</div>`).join('')}</div>
+  `;
+  $('risync-scenes-section').style.display='block';
+  $('risync-scene-grid').innerHTML=S.risyncSections.map((sec,i)=>`
+    <div class="scene-card">
+      <div class="scene-num">Scene ${i+1}</div>
+      <div class="scene-thumb"><canvas id="vs-canvas-${i}"></canvas></div>
+      <div class="scene-time">${fmt(sec.start)} – ${fmt(sec.end)}</div>
+      <input class="scene-input" id="vs-prompt-${i}" value="${c.scenePrompts[i]||''}" placeholder="Describe scene...">
+      <div class="energy-row">
+        <div class="energy-bar-wrap"><div class="energy-bar" style="width:${Math.round(sec.energy*100)}%"></div></div>
+        <div class="energy-lbl">${Math.round(sec.energy*100)}%</div>
+      </div>
+    </div>
+  `).join('');
+  S.risyncSections.forEach((sec,i)=>drawSceneThumb(i,sec));
+  $('risync-style-section').style.display='block';
+  updateRisyncSummary();
+  $('risync-scenes-section').scrollIntoView({behavior:'smooth'});
+}
+
+function drawSceneThumb(i,sec){
+  const canvas=$('vs-canvas-'+i);
+  if(!canvas||!S.risyncAudioBuffer) return;
+  const W=canvas.offsetWidth||160, H=canvas.offsetHeight||56;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const data=S.risyncAudioBuffer.getChannelData(0);
+  const sr=S.risyncAudioBuffer.sampleRate;
+  const chunk=data.slice(Math.floor(sec.start*sr),Math.floor(sec.end*sr));
+  const step=Math.ceil(chunk.length/W);
+  const g=ctx.createLinearGradient(0,0,W,0);
+  g.addColorStop(0,'#28B8A040'); g.addColorStop(1,'#F0A03040');
+  ctx.fillStyle='#0F1220'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=g;
+  for(let x=0;x<W;x++){
+    let max=0;
+    for(let j=0;j<step;j++){const v=Math.abs(chunk[x*step+j]||0);if(v>max)max=v;}
+    const h=max*H*.9; ctx.fillRect(x,(H-h)/2,1,h);
+  }
+}
+
+// Style selector
+document.getElementById('risync-style-grid').addEventListener('click',e=>{
+  const btn=e.target.closest('.style-btn');
+  if(!btn)return;
+  document.querySelectorAll('#risync-style-grid .style-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  S.risyncStyle=btn.dataset.style;
+  updateRisyncSummary();
+});
+
+function updateRisyncSummary(){
+  const n=S.risyncSections.length;
+  $('risync-send-summary').innerHTML=`<strong>${n} scenes</strong> · <strong>${S.risyncStyle}</strong> · <strong>${$('vs-resolution')?.value||'1080p'}</strong> · est. ${Math.ceil(n*1.5)} min on Colab`;
+}
+
+$('risync-send-btn').addEventListener('click', sendForCreation);
+
+async function sendForCreation(){
+  const scenePrompts = S.risyncSections.map((_,i)=>$('vs-prompt-'+i)?.value||'');
+  $('risync-style-section').style.display='none';
+  $('risync-scenes-section').style.display='none';
+  $('risync-status').style.display='block';
+  $('vs-log').innerHTML='';
+  log('vs-log','Job ready: '+S.risyncSections.length+' scenes');
+  log('vs-log','Style: '+S.risyncStyle+' · '+($('vs-resolution')?.value||'1080p'));
+  log('vs-log','Sending to backend...');
+  setProgress('vs-prog-fill','vs-prog-label',5,'Submitting...');
+
+  // POST to Render backend
+  try {
+    const formData = new FormData();
+    if(S.risyncAudioFile) formData.append('audio', S.risyncAudioFile);
+    if(S.risyncVideoFile) formData.append('video', S.risyncVideoFile instanceof File ? S.risyncVideoFile : new File([S.risyncVideoFile],'take.webm',{type:'video/webm'}));
+    formData.append('payload', JSON.stringify({
+      style:S.risyncStyle, resolution:$('vs-resolution')?.value||'1080p',
+      clipLength:parseInt($('vs-clip-len')?.value||9),
+      transition:$('vs-transition')?.value||'crossfade',
+      storyline:$('risync-storyline').value,
+      context:S.risyncContext, scenePrompts,
+      sections:S.risyncSections,
+      perfVideoMode:$('perf-video-mode')?.value||'intercut',
+      vocalModel:S.voiceModelName,
+    }));
+    const res = await fetch(S.BACKEND+'/api/jobs',{method:'POST',body:formData});
+    if(!res.ok) throw new Error('Backend '+res.status);
+    const job = await res.json();
+    log('vs-log','Job ID: '+job.jobId);
+    pollJob(job.jobId);
+  } catch(e){
+    log('vs-log','[Demo mode — backend not connected]');
+    log('vs-log','In production this posts to your Render backend.');
+    simulateCreation();
+  }
+}
+
+function pollJob(jobId){
+  const iv = setInterval(async()=>{
+    try {
+      const r = await fetch(S.BACKEND+'/api/jobs/'+jobId);
+      const j = await r.json();
+      setProgress('vs-prog-fill','vs-prog-label',j.progress||0,j.statusLabel||'');
+      $('vs-status-title').textContent = j.statusLabel||'Processing...';
+      if(j.log) log('vs-log',j.log);
+      if(j.status==='complete'){clearInterval(iv);showResult(j.videoUrl);}
+      if(j.status==='failed'){clearInterval(iv);log('vs-log','Error: '+j.error);}
+    } catch(e){}
+  },4000);
+}
+
+function simulateCreation(){
+  const steps=[
+    [12,'Audio analysis complete'],
+    [24,'Generating scene 1 / '+S.risyncSections.length+'...'],
+    [36,'Generating scene 2 / '+S.risyncSections.length+'...'],
+    [50,'Generating scene 3 / '+S.risyncSections.length+'...'],
+    [64,'Intercutting with performance video...'],
+    [76,'Stitching clips...'],
+    [86,'Adding master audio...'],
+    [94,'Rendering final video...'],
+    [100,'Complete!'],
+  ];
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=steps.length){clearInterval(iv);showResult(null);return;}
+    const [pct,label]=steps[i];
+    setProgress('vs-prog-fill','vs-prog-label',pct,label+' ('+pct+'%)');
+    $('vs-status-title').textContent=label;
+    log('vs-log',label);
+    i++;
+  },1800);
+}
+
+function showResult(url){
+  $('risync-status').style.display='none';
+  $('risync-result').style.display='block';
+  if(url){$('result-video').src=url; $('dl-video-btn').href=url;}
+  else{log('vs-log','Connect Render backend to receive real video.');}
+  $('risync-result').scrollIntoView({behavior:'smooth'});
+  toast('Video ready!');
+}
+
+$('new-video-btn').addEventListener('click',()=>location.reload());
+window.addEventListener('resize',()=>{
+  if(S.audioBuffer) drawWaveformCanvas('master-waveform',S.audioBuffer);
+  if(S.risyncAudioBuffer) S.risyncSections.forEach((sec,i)=>drawSceneThumb(i,sec));
+});
+
+// ══════════════════════════════════════════════════════════════
+// SESSION TAB — WebRTC multi-camera + remote musicians
+// ══════════════════════════════════════════════════════════════
+
+const SESSION = {
+  ws: null, peerId: null, roomId: null,
+  peers: new Map(),      // peerId → { pc, stream, name, role }
+  remoteVideos: new Map(),
+  recMode: 'director',
+};
+
+const WS_URL  = (S.BACKEND.replace('http','ws').replace('https','wss'));
+const STUN    = [{ urls:'stun:stun.l.google.com:19302' },{ urls:'stun:stun1.l.google.com:19302' }];
+const PORTAL  = window.location.origin + '/musician-portal.html';
+
+// ── Create session ────────────────────────────────────────────
+$('create-room-btn').addEventListener('click', ()=>{
+  const name    = $('session-name-input').value.trim() || 'Untitled Session';
+  const host    = $('host-name-input').value.trim()    || 'Host';
+  connectSessionWS(name, host);
+});
+
+function connectSessionWS(sessionName, hostName){
+  SESSION.ws = new WebSocket(WS_URL);
+  SESSION.ws.onopen = ()=>{
+    SESSION.ws.send(JSON.stringify({ type:'create-room', name:hostName, sessionName }));
+  };
+  SESSION.ws.onmessage = e => handleSessionMsg(JSON.parse(e.data));
+  SESSION.ws.onclose   = ()=>{ sessionLog('Connection lost'); };
+}
+
+function send2(msg){ if(SESSION.ws?.readyState===1) SESSION.ws.send(JSON.stringify(msg)); }
+
+function handleSessionMsg(msg){
+  switch(msg.type){
+    case 'connected':
+      SESSION.peerId = msg.peerId;
+      break;
+
+    case 'room-created':
+      SESSION.roomId = msg.roomId;
+      showSessionLive(msg);
+      break;
+
+    case 'peer-joined':
+      sessionLog(`${msg.name} joined (${msg.role})`);
+      addRemoteParticipant(msg);
+      createHostPeerConn(msg.peerId, msg.name, true);
+      updateParticipantCount();
+      break;
+
+    case 'peer-left':
+      sessionLog('A participant left');
+      removeRemoteParticipant(msg.peerId);
+      SESSION.peers.get(msg.peerId)?.pc.close();
+      SESSION.peers.delete(msg.peerId);
+      updateParticipantCount();
+      break;
+
+    case 'offer':
+      handleRemoteOffer(msg.fromPeerId, msg.sdp);
+      break;
+
+    case 'answer':
+      SESSION.peers.get(msg.fromPeerId)?.pc.setRemoteDescription({type:'answer',sdp:msg.sdp});
+      break;
+
+    case 'ice-candidate':
+      if(msg.candidate) SESSION.peers.get(msg.fromPeerId)?.pc.addIceCandidate(msg.candidate);
+      break;
+
+    case 'chat':
+      sessionLog(`${msg.fromName}: ${msg.text}`, false);
+      break;
+  }
+}
+
+// ── Show live session UI ──────────────────────────────────────
+function showSessionLive(msg){
+  $('session-setup-card').style.display='none';
+  $('session-live-card').style.display='block';
+  $('participants-card').style.display='block';
+  $('session-chat-card').style.display='block';
+  $('remote-mix-card').style.display='block';
+  $('session-live-name').textContent = msg.room.sessionName;
+  $('room-code-display').textContent = msg.roomId;
+
+  const joinUrl = `${PORTAL}?room=${msg.roomId}`;
+  $('invite-link').value = joinUrl;
+  $('join-url-display').textContent = joinUrl;
+  drawQRCode(msg.roomId, joinUrl);
+  sessionLog(`Session created: ${msg.roomId}`);
+  sessionLog(`Share invite link or QR code with musicians`);
+}
+
+// ── QR Code (pure canvas, no library) ────────────────────────
+function drawQRCode(roomId, url){
+  // Simple visual placeholder — in production use qrcode.js CDN
+  const canvas = $('qr-canvas');
+  const size = 140;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
+  ctx.fillStyle='#080B12';
+  // Draw room code as large text (replace with real QR library in production)
+  ctx.font='bold 13px JetBrains Mono, monospace';
+  ctx.textAlign='center';
+  ctx.fillText('SCAN TO JOIN',size/2,28);
+  ctx.font='bold 22px JetBrains Mono, monospace';
+  ctx.fillStyle='#F0A030';
+  ctx.fillText(roomId,size/2,70);
+  ctx.fillStyle='#080B12';
+  ctx.font='10px Inter, sans-serif';
+  ctx.fillText('RISYNC Session',size/2,95);
+  ctx.font='8px JetBrains Mono, monospace';
+  ctx.fillStyle='#5A6490';
+  const shortUrl = url.replace('https://','').substring(0,28)+'...';
+  ctx.fillText(shortUrl,size/2,115);
+  // Border
+  ctx.strokeStyle='#252B42'; ctx.lineWidth=2;
+  ctx.strokeRect(4,4,size-8,size-8);
+}
+
+$('copy-link-btn').addEventListener('click', ()=>{
+  navigator.clipboard.writeText($('invite-link').value);
+  toast('Invite link copied!');
+});
+
+// ── Peer connections (host side) ──────────────────────────────
+function createHostPeerConn(remotePeerId, name, initiate){
+  const pc = new RTCPeerConnection({iceServers:STUN});
+  SESSION.peers.set(remotePeerId, { pc, stream:null, name });
+
+  pc.onicecandidate = e=>{
+    if(e.candidate) send2({type:'ice-candidate',targetPeerId:remotePeerId,candidate:e.candidate});
+  };
+
+  pc.ontrack = e=>{
+    const p = SESSION.peers.get(remotePeerId);
+    if(p){ p.stream = e.streams[0]; }
+    addCameraToGrid(remotePeerId, name, e.streams[0]);
+    addAudioChannel(remotePeerId, name);
+  };
+
+  // Add local stream if available
+  if(S.videoStream) S.videoStream.getTracks().forEach(t=>pc.addTrack(t,S.videoStream));
+  if(S.mediaStream)  S.mediaStream.getTracks().filter(t=>t.kind==='audio').forEach(t=>pc.addTrack(t,S.mediaStream));
+
+  if(initiate){
+    pc.createOffer().then(o=>{ pc.setLocalDescription(o); send2({type:'offer',targetPeerId:remotePeerId,sdp:o.sdp}); });
+  }
+}
+
+async function handleRemoteOffer(fromPeerId, sdp){
+  const pc = createHostPeerConn(fromPeerId, 'Remote', false).pc;
+  await pc.setRemoteDescription({type:'offer',sdp});
+  const ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  send2({type:'answer',targetPeerId:fromPeerId,sdp:ans.sdp});
+}
+
+// ── Camera grid ───────────────────────────────────────────────
+function addCameraToGrid(peerId, name, stream){
+  const grid = $('camera-grid');
+  const slot = document.createElement('div');
+  slot.id = 'cam-slot-'+peerId;
+  slot.style.cssText = 'position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);aspect-ratio:4/3;background:var(--panel2);cursor:pointer';
+  slot.innerHTML = `
+    <video autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+    <div style="position:absolute;bottom:8px;left:8px;font-family:var(--fm);font-size:.63rem;background:rgba(8,11,18,.8);color:var(--bright);padding:3px 8px;border-radius:12px">${name}</div>
+    <div style="position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+  `;
+  slot.querySelector('video').srcObject = stream;
+  slot.addEventListener('click',()=>setActiveCamera(peerId, slot));
+  grid.insertBefore(slot, $('add-cam-slot'));
+}
+
+function removeRemoteParticipant(peerId){
+  $('cam-slot-'+peerId)?.remove();
+  $('audio-ch-'+peerId)?.remove();
+  $('hp-'+peerId)?.remove();
+}
+
+function setActiveCamera(peerId, el){
+  if(SESSION.recMode !== 'director') return;
+  document.querySelectorAll('#camera-grid > div').forEach(d=>d.style.outline='none');
+  el.style.outline = '2px solid var(--amber)';
+  toast('Active camera switched');
+}
+
+// ── Audio channels ────────────────────────────────────────────
+function addAudioChannel(peerId, name){
+  const ch = $('remote-audio-channels');
+  if(ch.querySelector('div[style*="var(--subtle)"]')) ch.innerHTML='';
+  const el = document.createElement('div');
+  el.id='audio-ch-'+peerId;
+  el.className='vu-row';
+  el.innerHTML=`
+    <div class="vu-name">${name}</div>
+    <div class="vu-track"><div class="vu-fill" id="vu-remote-${peerId.substring(0,6)}"></div></div>
+    <input type="range" min="0" max="100" value="80" style="width:60px;accent-color:var(--amber)" title="Volume">
+    <button onclick="send2({type:'host-mute',targetPeerId:'${peerId}',muted:true})" style="background:none;border:none;color:var(--subtle);cursor:pointer;font-size:.75rem" title="Mute">🔇</button>
+  `;
+  ch.appendChild(el);
+}
+
+// ── Participants list ──────────────────────────────────────────
+function addRemoteParticipant(p){
+  const list = $('host-participants-list');
+  if(list.querySelector('div[style*="var(--subtle)"]')) list.innerHTML='';
+  const el = document.createElement('div');
+  el.id='hp-'+p.peerId;
+  el.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--r)';
+  el.innerHTML=`
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+    <div style="flex:1">
+      <div style="font-size:.82rem;color:var(--bright);font-weight:500">${p.name}</div>
+      <div style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)">${p.role}</div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="send2({type:'host-mute',targetPeerId:'${p.peerId}',muted:true})" style="padding:4px 10px;font-size:.65rem">Mute</button>
+  `;
+  list.appendChild(el);
+}
+
+function updateParticipantCount(){
+  const n = SESSION.peers.size;
+  const badge = $('session-count-badge');
+  if(n>0){ badge.style.display='inline'; badge.textContent=n; }
+  else { badge.style.display='none'; }
+}
+
+// ── Session chat ──────────────────────────────────────────────
+function sessionLog(text, isSystem=true){
+  const box=$('session-chat-log');
+  if(!box) return;
+  box.innerHTML+=`<div style="color:${isSystem?'var(--subtle)':'var(--body)'}">» ${text}</div>`;
+  box.scrollTop=box.scrollHeight;
+}
+$('session-chat-send').addEventListener('click',()=>{
+  const t=$('session-chat-input').value.trim();
+  if(!t) return;
+  send2({type:'chat',text:t});
+  sessionLog(`You: ${t}`, false);
+  $('session-chat-input').value='';
+});
+$('session-chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') $('session-chat-send').click(); });
+
+// ── Recording mode ────────────────────────────────────────────
+window.setRecMode = (mode, btn)=>{
+  SESSION.recMode = mode;
+  document.querySelectorAll('#tab-session .style-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  $('mode-desc').innerHTML = mode==='director'
+    ? '<strong style="color:var(--body)">Director mode:</strong> click any camera tile during recording to switch the active angle. Output is one video with your cuts baked in.'
+    : '<strong style="color:var(--body)">Multitrack mode:</strong> all camera angles record simultaneously as separate files. Edit in the timeline after your session.';
+};
+
+// ── End session ───────────────────────────────────────────────
+$('end-session-btn').addEventListener('click',()=>{
+  SESSION.ws?.close();
+  SESSION.peers.forEach(({pc})=>pc.close());
+  SESSION.peers.clear();
+  $('session-live-card').style.display='none';
+  $('session-setup-card').style.display='block';
+  $('participants-card').style.display='none';
+  $('session-chat-card').style.display='none';
+  $('remote-mix-card').style.display='none';
+  $('camera-grid').innerHTML=`
+    <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">
+      <div style="font-size:1.5rem">📷</div>
+      <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Your webcam</div>
+    </div>
+    <div id="add-cam-slot" style="aspect-ratio:4/3;background:var(--panel2);border:2px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">
+      <div style="font-size:1.5rem">＋</div>
+      <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Create session</div>
+    </div>`;
+  $('session-count-badge').style.display='none';
+  toast('Session ended');
+});
+</script>
+</body>
+</html>
