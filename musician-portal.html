@@ -534,6 +534,7 @@ $('allow-btn').addEventListener('click', () => {
     show('screen-live');
     connectWS();
     CAM.init(stream);
+    if (stream.getAudioTracks().length > 0) setupVU();
   })
   .catch(err => {
     btn.textContent = 'Allow camera & continue →';
@@ -703,22 +704,47 @@ function removeParticipantItem(peerId){ $('lp-'+peerId)?.remove(); }
 
 // ── VU METER ──────────────────────────────────────────────────
 function setupVU(){
-  S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  const src = S.audioCtx.createMediaStreamSource(S.localStream);
-  S.analyser = S.audioCtx.createAnalyser();
-  S.analyser.fftSize=256;
-  src.connect(S.analyser);
-  const data=new Uint8Array(128);
-  function draw(){
-    S.vuFrame=requestAnimationFrame(draw);
-    S.analyser.getByteFrequencyData(data);
-    const avg=data.reduce((a,b)=>a+b,0)/data.length;
-    const pct=Math.min(100,avg/128*200);
-    const db=pct>0?Math.round(20*Math.log10(pct/100)):'-∞';
-    $('mic-meter').style.width=pct+'%';
-    $('mic-db').textContent=db+'dB';
+  try {
+    S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+    // Resume context — required on mobile Chrome after user gesture
+    if (S.audioCtx.state === 'suspended') {
+      S.audioCtx.resume().then(() => {
+        console.log('[Portal] AudioContext resumed');
+      });
+    }
+
+    const audioTrack = S.localStream.getAudioTracks()[0];
+    if (!audioTrack) {
+      console.warn('[Portal] No audio track for VU meter');
+      return;
+    }
+
+    console.log('[Portal] Setting up VU meter for track:', audioTrack.label);
+    const micStream = new MediaStream([audioTrack]);
+    const src = S.audioCtx.createMediaStreamSource(micStream);
+    S.analyser = S.audioCtx.createAnalyser();
+    S.analyser.fftSize = 256;
+    src.connect(S.analyser);
+
+    const data = new Uint8Array(128);
+    function draw(){
+      S.vuFrame = requestAnimationFrame(draw);
+      if (!S.analyser) return;
+      S.analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const pct = Math.min(100, avg/128*200);
+      const db  = pct > 0 ? Math.round(20*Math.log10(pct/100)) : '-∞';
+      const meter = $('mic-meter');
+      const dbEl  = $('mic-db');
+      if (meter) meter.style.width = pct+'%';
+      if (dbEl)  dbEl.textContent  = db+'dB';
+    }
+    draw();
+    console.log('[Portal] VU meter running');
+  } catch(e) {
+    console.error('[Portal] VU setup error:', e.message);
   }
-  draw();
 }
 
 // ── CONTROLS ──────────────────────────────────────────────────
