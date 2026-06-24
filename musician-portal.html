@@ -314,29 +314,57 @@ async function handleOffer(fromPeerId, sdp) {
   send({ type:'answer', sdp:answer.sdp, targetPeerId:fromPeerId });
 }
 
-// FLIP — use applyConstraints to switch camera without stopping track
+// FLIP — close PC, switch camera, reconnect
 let camDevices = [];
+let camIdx = 0;
+
 navigator.mediaDevices.enumerateDevices().then(d => {
   camDevices = d.filter(x => x.kind === 'videoinput');
 });
-let camIdx = 0;
 
 $('flip-btn').addEventListener('click', async () => {
-  if (camDevices.length < 2) { log('Only 1 camera found', true); return; }
+  if (camDevices.length < 2) { log('Only 1 camera', true); return; }
+
   camIdx = (camIdx + 1) % camDevices.length;
   const nextCam = camDevices[camIdx];
-  const track = localStream.getVideoTracks()[0];
-  if (!track) return;
+  const vid = $('live-video');
+
   try {
-    await track.applyConstraints({ deviceId: { exact: nextCam.deviceId } });
+    // Step 1: close all peer connections — releases camera lock
+    peers.forEach(pc => pc.close());
+    peers.clear();
+
+    // Step 2: stop all video tracks
+    localStream.getVideoTracks().forEach(t => t.stop());
+    localStream.getVideoTracks().forEach(t => localStream.removeTrack(t));
+
+    // Step 3: wait for release
+    await new Promise(r => setTimeout(r, 500));
+
+    // Step 4: open new camera
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: nextCam.deviceId } },
+      audio: false
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+    localStream.addTrack(newTrack);
+
+    // Step 5: update preview
+    vid.srcObject = new MediaStream([newTrack, ...localStream.getAudioTracks()]);
+    vid.play().catch(() => {});
+
     const label = nextCam.label || 'Camera ' + camIdx;
     const isFront = label.toLowerCase().includes('front') || label.toLowerCase().includes('user');
     facingMode = isFront ? 'user' : 'environment';
     $('cam-name').textContent = isFront ? '🤳 Front' : '📷 Rear';
-    $('live-video').style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
-    log('Camera: ' + label, true);
+    vid.style.transform = isFront ? 'scaleX(-1)' : 'scaleX(1)';
+    log('Switched to ' + label + ' — reconnecting...', true);
+
+    // Step 6: reconnect WebSocket to re-establish peer connection
+    if (ws) ws.close();
+
   } catch(e) {
-    log('Flip: ' + e.message, true);
+    log('Flip failed: ' + e.message, true);
   }
 });
 
