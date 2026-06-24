@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>RISYNC — Join Session</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -193,14 +196,6 @@ input:focus,select:focus{border-color:var(--amber)}
 
     <div class="error-box" id="join-error"></div>
 
-    <div id="session-preview" style="display:none">
-      <div class="session-info">
-        <div class="session-name" id="preview-session-name">Loading...</div>
-        <div class="session-host" id="preview-session-host"></div>
-        <div class="participants-list" id="preview-participants"></div>
-      </div>
-    </div>
-
     <div class="field">
       <label>Room code</label>
       <input type="text" id="room-code" placeholder="e.g. A3F7B2C1" maxlength="8"
@@ -226,7 +221,7 @@ input:focus,select:focus{border-color:var(--amber)}
     </div>
 
     <button class="btn btn-primary" id="join-btn">Join session →</button>
-    <button class="btn btn-secondary" id="preview-btn">Preview room first</button>
+
   </div>
 </div>
 
@@ -454,22 +449,7 @@ $('room-code').addEventListener('input', e => {
   e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
 });
 
-$('preview-btn').addEventListener('click', async () => {
-  const code = $('room-code').value.trim();
-  if(code.length < 6){ showError('Enter a valid room code'); return; }
-  try {
-    const res = await fetch(`${BACKEND_API}/api/rooms/${code}`);
-    if(!res.ok){ showError('Room not found — check the code'); return; }
-    const room = await res.json();
-    clearError();
-    $('preview-session-name').textContent = room.sessionName;
-    $('preview-session-host').textContent = 'Hosted by ' + room.hostName;
-    $('preview-participants').innerHTML = room.participants.map(p =>
-      `<div class="participant-item"><div class="participant-dot"></div>${p.name} · ${p.role}</div>`
-    ).join('');
-    $('session-preview').style.display='block';
-  } catch(e){ showError('Cannot reach server'); }
-});
+// preview-btn removed
 
 // ── JOIN FLOW ─────────────────────────────────────────────────
 $('join-btn').addEventListener('click', () => {
@@ -621,8 +601,12 @@ async function handleMessage(msg){
       break;
 
     case 'error':
+      console.warn('[Portal] Server error:', msg.message);
+      // Only redirect to join if we're on live screen
+      if (document.getElementById('screen-live').classList.contains('active')) {
+        show('screen-join');
+      }
       showError(msg.message);
-      show('screen-join');
       break;
   }
 }
@@ -883,12 +867,9 @@ $('leave-btn').addEventListener('click', ()=>{
 });
 
 // ── AUTO JOIN FROM URL PARAM ──────────────────────────────────
-// Just fill the room code — don't auto-preview (room may not exist yet)
 if (urlRoom) {
   $('room-code').value = urlRoom.toUpperCase();
-  // Show a helpful message
   clearError();
-  document.getElementById('session-preview').style.display = 'none';
 }
 </script>
 </body>
