@@ -313,20 +313,24 @@ $('join-btn').addEventListener('click', () => {
 // ALLOW CAM + MIC — exact same as original working version
 $('allow-btn').addEventListener('click', async () => {
   try {
-    // Enumerate cameras first, pick rear by deviceId
-    const allDevices = await navigator.mediaDevices.enumerateDevices();
-    const allCams = allDevices.filter(d => d.kind === 'videoinput');
-    // Find rear camera — label contains 'back' or 'environment', else use last device
-    const rearCam = allCams.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'))
-                 || allCams[allCams.length - 1];
-    const videoConstraint = rearCam?.deviceId
-      ? { deviceId: { exact: rearCam.deviceId } }
-      : { facingMode: 'environment' };
+    // Get mic first
+    let audioStream = null;
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+    } catch(e) {}
 
-    S.localStream = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraint,
-      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
-    });
+    // Get video — try rear first, fallback to any
+    let videoStream = null;
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch(e) {
+      videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+
+    // Combine
+    const tracks = [...videoStream.getVideoTracks()];
+    if (audioStream) audioStream.getAudioTracks().forEach(t => tracks.push(t));
+    S.localStream = new MediaStream(tracks);
     S.facingMode = 'environment';
     $('local-video').srcObject = S.localStream;
     // no mirror
