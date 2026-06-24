@@ -1968,22 +1968,45 @@ const REC = {
   },
 
   attachPhoneVideo(peerId, stream) {
+    console.log('[RISYNC] Attaching video for peer:', peerId, 'stream tracks:', stream?.getTracks().length);
+    
+    const tile = $(`cam-tile-${peerId}`);
+    if (!tile) {
+      console.warn('[RISYNC] No tile found for peer:', peerId);
+      return;
+    }
+
+    // Hide overlay
     const overlay = $(`phone-overlay-${peerId}`);
     if (overlay) overlay.style.display = 'none';
-    // Create or find video element in tile
+
+    // Update status dot to live
+    const status = $(`phone-status-${peerId}`);
+    if (status) status.className = 'cam-tile-status live';
+
+    // Create video element
     let vid = $(`phone-vid-${peerId}`);
     if (!vid) {
-      const tile = $(`cam-tile-${peerId}`);
-      if (!tile) return;
       vid = document.createElement('video');
       vid.id = `phone-vid-${peerId}`;
       vid.autoplay = true;
       vid.playsinline = true;
       vid.muted = true;
-      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+      vid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;z-index:1';
       tile.insertBefore(vid, tile.firstChild);
     }
+
+    // Attach stream and force play
     vid.srcObject = stream;
+    vid.play().then(() => {
+      console.log('[RISYNC] Phone video playing successfully');
+      toast('📱 Phone camera live!');
+    }).catch(e => {
+      console.warn('[RISYNC] Video play failed:', e.message);
+      // Try again on user interaction
+      tile.addEventListener('click', () => vid.play(), { once: true });
+      toast('Tap the phone tile to start video');
+    });
   },
 
   // ── QR code + room ───────────────────────────────────────────
