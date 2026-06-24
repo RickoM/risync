@@ -2994,10 +2994,12 @@ function createHostPeerConn(remotePeerId, name, initiate){
   if(initiate){
     pc.createOffer().then(o=>{ pc.setLocalDescription(o); send2({type:'offer',targetPeerId:remotePeerId,sdp:o.sdp}); });
   }
+
+  return pc;
 }
 
 async function handleRemoteOffer(fromPeerId, sdp){
-  const pc = createHostPeerConn(fromPeerId, 'Remote', false).pc;
+  const pc = createHostPeerConn(fromPeerId, 'Remote', false);
   await pc.setRemoteDescription({type:'offer',sdp});
   const ans = await pc.createAnswer();
   await pc.setLocalDescription(ans);

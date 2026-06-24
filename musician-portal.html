@@ -293,8 +293,12 @@ function chatLog(name, text, isSystem=false){
 }
 
 // AUTO-FILL ROOM CODE
-const urlRoom = new URLSearchParams(window.location.search).get('room');
+const urlParams = new URLSearchParams(window.location.search);
+const urlRoom = urlParams.get('room');
 if(urlRoom){ $('room-code').value=urlRoom.toUpperCase(); }
+if(urlParams.get('name'))  $('join-name').value  = urlParams.get('name');
+if(urlParams.get('role'))  $('join-role').value  = urlParams.get('role');
+if(urlParams.get('label')) $('join-label').value = urlParams.get('label');
 
 $('room-code').addEventListener('input', e => {
   e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -398,6 +402,9 @@ async function handleMessage(msg){
       break;
     case 'ice-candidate':
       if(msg.candidate) await S.peers.get(msg.fromPeerId)?.addIceCandidate(msg.candidate);
+      break;
+    case 'flip-camera':
+      await switchCamera();
       break;
     case 'chat':
       chatLog(msg.fromName, msg.text);
@@ -517,6 +524,7 @@ async function loadCameras() {
 }
 
 async function flipCamera(){
+  return switchCamera();
   if (!S.camList.length) await loadCameras();
   if (S.camList.length < 2) { chatLog('', 'Only one camera found', true); return; }
 
@@ -541,6 +549,81 @@ async function flipCamera(){
   S.localStream?.getTracks().forEach(t => t.stop());
 
   window.location.href = url.toString();
+}
+
+function isFrontCamera(device) {
+  const label = (device?.label || '').toLowerCase();
+  return label.includes('front') || label.includes('forward') || label.includes('user') || label.includes('selfie');
+}
+
+function isBackCamera(device) {
+  const label = (device?.label || '').toLowerCase();
+  return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('world');
+}
+
+async function pickNextCamera() {
+  await loadCameras();
+  if (S.camList.length < 2) return null;
+
+  const currentTrack = S.localStream?.getVideoTracks()[0];
+  const settings = currentTrack?.getSettings?.() || {};
+  const currentId = settings.deviceId;
+  const currentIdx = S.camList.findIndex(d => d.deviceId === currentId);
+  const currentCam = S.camList[currentIdx >= 0 ? currentIdx : S.camIdx];
+  const currentFacing = settings.facingMode || (isFrontCamera(currentCam) ? 'user' : isBackCamera(currentCam) ? 'environment' : S.facingMode);
+
+  let preferred = null;
+  if (currentFacing === 'user') {
+    preferred = S.camList.find(d => d.deviceId !== currentId && isBackCamera(d));
+  } else if (currentFacing === 'environment') {
+    preferred = S.camList.find(d => d.deviceId !== currentId && isFrontCamera(d));
+  }
+
+  if (preferred) {
+    S.camIdx = S.camList.findIndex(d => d.deviceId === preferred.deviceId);
+    return preferred;
+  }
+
+  S.camIdx = currentIdx >= 0 ? currentIdx : S.camIdx;
+  S.camIdx = (S.camIdx + 1) % S.camList.length;
+  return S.camList[S.camIdx];
+}
+
+async function switchCamera(){
+  try {
+    const nextCam = await pickNextCamera();
+    const currentTrack = S.localStream?.getVideoTracks()[0];
+    const currentFacing = currentTrack?.getSettings?.().facingMode || S.facingMode;
+    const fallbackFacing = currentFacing === 'user' ? 'environment' : 'user';
+    const video = nextCam
+      ? { deviceId: { exact: nextCam.deviceId }, width:{ideal:1280}, height:{ideal:720} }
+      : { facingMode: { ideal: fallbackFacing }, width:{ideal:1280}, height:{ideal:720} };
+
+    const newStream = await navigator.mediaDevices.getUserMedia({ video, audio:false });
+    const newTrack = newStream.getVideoTracks()[0];
+    if (!newTrack) throw new Error('No video track returned');
+
+    S.peers.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) sender.replaceTrack(newTrack);
+    });
+
+    currentTrack?.stop();
+    S.localStream.getVideoTracks().forEach(track => {
+      if (track !== currentTrack) track.stop();
+      S.localStream.removeTrack(track);
+    });
+    S.localStream.addTrack(newTrack);
+    newTrack.enabled = !S.camOff;
+    $('local-video').srcObject = S.localStream;
+
+    const settings = newTrack.getSettings?.() || {};
+    S.facingMode = settings.facingMode || (nextCam && isFrontCamera(nextCam) ? 'user' : 'environment');
+    await loadCameras();
+    chatLog('', 'Camera switched', true);
+  } catch(e) {
+    chatLog('', 'Camera switch failed: ' + e.message, true);
+  }
 }
 
 // CHAT
