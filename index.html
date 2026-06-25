@@ -1295,62 +1295,6 @@ label.field-label{
 
       <!-- Audio mix per participant -->
       <!-- NETWORK AUDIO QUALITY CONTROL -->
-      <div class="card mt16" id="audio-quality-card" style="display:none">
-        <div class="card-title" style="margin-bottom:12px">Network audio quality</div>
-        <div style="font-family:var(--fm);font-size:.7rem;color:var(--subtle);margin-bottom:12px;line-height:1.7">
-          Higher quality needs more bandwidth. Drop to a lower preset if you hear dropouts or glitching.
-        </div>
-
-        <!-- Quality presets -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="quality-presets">
-          <button class="quality-btn" data-preset="studio" onclick="REC.setAudioQuality('studio', this)"
-            style="padding:10px 6px;background:var(--teal-glow);border:1px solid var(--teal);border-radius:8px;color:var(--teal);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
-            <div style="font-size:.8rem;margin-bottom:3px">🎙</div>
-            <div style="font-weight:700">Studio</div>
-            <div style="color:var(--subtle);margin-top:2px">510kbps</div>
-          </button>
-          <button class="quality-btn" data-preset="high" onclick="REC.setAudioQuality('high', this)"
-            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
-            <div style="font-size:.8rem;margin-bottom:3px">🔊</div>
-            <div style="font-weight:700">High</div>
-            <div style="color:var(--subtle);margin-top:2px">128kbps</div>
-          </button>
-          <button class="quality-btn" data-preset="medium" onclick="REC.setAudioQuality('medium', this)"
-            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
-            <div style="font-size:.8rem;margin-bottom:3px">📶</div>
-            <div style="font-weight:700">Medium</div>
-            <div style="color:var(--subtle);margin-top:2px">64kbps</div>
-          </button>
-          <button class="quality-btn" data-preset="voice" onclick="REC.setAudioQuality('voice', this)"
-            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
-            <div style="font-size:.8rem;margin-bottom:3px">📞</div>
-            <div style="font-weight:700">Voice</div>
-            <div style="color:var(--subtle);margin-top:2px">32kbps</div>
-          </button>
-        </div>
-
-        <!-- Current stats -->
-        <div style="display:flex;gap:16px;padding:10px 12px;background:var(--panel2);border-radius:8px;border:1px solid var(--border)">
-          <div>
-            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Latency</div>
-            <div style="font-family:var(--fm);font-size:.9rem;color:var(--bright)" id="quality-latency">— ms</div>
-          </div>
-          <div>
-            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Quality</div>
-            <div style="font-family:var(--fm);font-size:.9rem;color:var(--teal)" id="quality-current">Studio</div>
-          </div>
-          <div>
-            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Recommended</div>
-            <div style="font-family:var(--fm);font-size:.9rem;color:var(--amber)" id="quality-recommended">—</div>
-          </div>
-          <div style="margin-left:auto;display:flex;align-items:center">
-            <button onclick="REC.autoSelectQuality()" style="font-family:var(--fm);font-size:.65rem;padding:6px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--subtle);cursor:pointer">
-              ⚡ Auto
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div class="card mt16" id="remote-mix-card" style="display:none">
         <div class="card-title" style="margin-bottom:12px">Remote audio mix</div>
         <div id="remote-audio-channels" style="display:flex;flex-direction:column;gap:10px">
@@ -1931,7 +1875,6 @@ const REC = {
         console.log('[RISYNC] Room:', this._pendingRoomCode);
         toast(`${msg.name || 'Phone'} connected — establishing video...`);
         $('qr-modal').classList.remove('open');
-        $('audio-quality-card').style.display = 'block';
         this.addPhoneCamera(msg.peerId, msg.name || 'Phone');
         // Delay then send WebRTC offer to phone
         setTimeout(async () => {
@@ -2017,14 +1960,17 @@ const REC = {
         if (status) { status.className = 'cam-tile-status live'; }
         if (conn)   { conn.style.display = 'none'; }
         toast('Phone camera live!');
-        // Poll RTT every 3s to update quality panel
+        // Show phone controller strip
+        const ctrlStrip = $('phone-ctrl-' + peerId);
+        if (ctrlStrip) ctrlStrip.style.display = 'block';
+        // Poll RTT every 3s to update quality display in controller
         const rttPoll = setInterval(async () => {
           if (pc.connectionState === 'closed') { clearInterval(rttPoll); return; }
           try {
             const stats = await pc.getStats();
             stats.forEach(r => {
               if (r.type === 'candidate-pair' && r.nominated && r.currentRoundTripTime != null) {
-                REC.updateQualityStats(Math.round(r.currentRoundTripTime * 1000));
+                REC.updateQualityStats(Math.round(r.currentRoundTripTime * 1000), peerId);
               }
             });
           } catch(e) {}
@@ -2036,13 +1982,88 @@ const REC = {
       }
     };
 
+    // Store talkback senders so we can toggle them later
+    this.talkbackSenders = this.talkbackSenders || new Map();
+    this.talkbackSenders.set(peerId, { audio: null, video: null });
+
     if (initiate) {
+      // Add studio mic (talkback) — always on, low volume
+      if (this.audioStream) {
+        const audioTrack = this.audioStream.getAudioTracks()[0];
+        if (audioTrack) {
+          const sender = pc.addTrack(audioTrack, this.audioStream);
+          this.talkbackSenders.get(peerId).audio = sender;
+        }
+      }
+      // Video return off by default — added on demand via sendVideoReturn()
       const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
       const hqOffer = new RTCSessionDescription({ type:'offer', sdp: REC.buildOpusSDP ? REC.buildOpusSDP(offer.sdp, REC.currentQuality||'studio') : setHighQualityOpus(offer.sdp) });
       await pc.setLocalDescription(hqOffer);
       this.sigSend({ type:'offer', sdp: hqOffer.sdp, fromPeerId: this.studioPeerId, targetPeerId: peerId });
     }
     return pc;
+  },
+
+  // Toggle studio video return to phone
+  async sendVideoReturn(peerId, enabled) {
+    const pc      = this.phonePeers?.get(peerId);
+    const senders = this.talkbackSenders?.get(peerId);
+    if (!pc || !senders) return;
+
+    if (enabled && this.videoStream) {
+      const videoTrack = this.videoStream.getVideoTracks()[0];
+      if (videoTrack) {
+        if (senders.video) {
+          senders.video.replaceTrack(videoTrack);
+        } else {
+          senders.video = pc.addTrack(videoTrack, this.videoStream);
+        }
+        // Renegotiate
+        const offer = await pc.createOffer();
+        const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP(offer.sdp, this.currentQuality||'studio') });
+        await pc.setLocalDescription(hqOffer);
+        this.sigSend({ type:'offer', sdp:hqOffer.sdp, fromPeerId:this.studioPeerId, targetPeerId:peerId });
+        toast('Studio video sent to phone');
+      }
+    } else if (!enabled && senders.video) {
+      senders.video.replaceTrack(null);
+      toast('Studio video return stopped');
+    }
+  },
+
+  // Toggle talkback mic on/off
+  setTalkback(peerId, enabled) {
+    const senders = this.talkbackSenders?.get(peerId);
+    if (!senders?.audio) { toast('No studio mic selected'); return; }
+    senders.audio.track.enabled = enabled;
+    toast(enabled ? '🎙 Talkback on' : '🎙 Talkback off');
+  },
+
+  // Toggle talkback button — push-to-talk style
+  toggleTalkback(peerId, btn) {
+    const shortId = peerId.substring(0,6);
+    const active  = btn.dataset.active === 'true';
+    const next    = !active;
+    btn.dataset.active  = next;
+    btn.style.background   = next ? 'rgba(240,160,48,.2)'  : 'var(--panel2)';
+    btn.style.borderColor  = next ? 'var(--amber)'          : 'var(--border)';
+    btn.style.color        = next ? 'var(--amber)'          : 'var(--body)';
+    btn.innerHTML = next
+      ? '🎙 Talkback <span style="font-size:.6rem">ON</span>'
+      : '🎙 Talkback <span style="font-size:.6rem;color:var(--subtle)">(hold)</span>';
+    this.setTalkback(peerId, next);
+  },
+
+  // Toggle video return on/off
+  toggleVideoReturn(peerId, btn) {
+    const active = btn.dataset.active === 'true';
+    const next   = !active;
+    btn.dataset.active   = next;
+    btn.style.background  = next ? 'rgba(128,96,224,.2)' : 'var(--panel2)';
+    btn.style.borderColor = next ? 'var(--violet)'        : 'var(--border)';
+    btn.style.color       = next ? 'var(--violet)'        : 'var(--body)';
+    btn.textContent       = next ? '📺 Video ON'          : '📺 Video return';
+    this.sendVideoReturn(peerId, next);
   },
 
   async handlePhoneOffer(fromPeerId, sdp) {
@@ -2184,6 +2205,79 @@ const REC = {
       </div>`;
     grid.insertBefore(tile, addTile);
     this.phoneCams.set(peerId, { tile, connected: false });
+
+    // Add phone controller strip below the tile
+    const ctrl = document.createElement('div');
+    ctrl.id = `phone-ctrl-${peerId}`;
+    ctrl.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;display:none';
+    ctrl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">📱 ${name || 'Phone'} controller</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-family:var(--fm);font-size:.65rem" id="q-latency-${peerId.substring(0,6)}">— ms</span>
+          <span style="font-family:var(--fm);font-size:.65rem;color:var(--teal)" id="q-current-${peerId.substring(0,6)}">Studio</span>
+        </div>
+      </div>
+
+      <!-- Quality presets -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+        <button class="quality-btn" data-preset="studio" data-peer="${peerId}"
+          onclick="REC.setAudioQuality('studio', this, '${peerId}')"
+          style="padding:7px 4px;background:var(--teal-glow);border:1px solid var(--teal);border-radius:7px;color:var(--teal);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
+          🎙 Studio<br><span style="color:var(--subtle);font-size:.55rem">510kbps</span>
+        </button>
+        <button class="quality-btn" data-preset="high" data-peer="${peerId}"
+          onclick="REC.setAudioQuality('high', this, '${peerId}')"
+          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
+          🔊 High<br><span style="color:var(--subtle);font-size:.55rem">128kbps</span>
+        </button>
+        <button class="quality-btn" data-preset="medium" data-peer="${peerId}"
+          onclick="REC.setAudioQuality('medium', this, '${peerId}')"
+          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
+          📶 Medium<br><span style="color:var(--subtle);font-size:.55rem">64kbps</span>
+        </button>
+        <button class="quality-btn" data-preset="voice" data-peer="${peerId}"
+          onclick="REC.setAudioQuality('voice', this, '${peerId}')"
+          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
+          📞 Voice<br><span style="color:var(--subtle);font-size:.55rem">32kbps</span>
+        </button>
+      </div>
+
+      <!-- Stats + auto button -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)">
+          Recommended: <span id="q-rec-${peerId.substring(0,6)}" style="color:var(--amber)">—</span>
+        </span>
+        <button onclick="REC.autoSelectQuality('${peerId}')"
+          style="margin-left:auto;font-family:var(--fm);font-size:.62rem;padding:4px 10px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--subtle);cursor:pointer">
+          ⚡ Auto
+        </button>
+      </div>
+
+      <!-- Talkback controls -->
+      <div style="border-top:1px solid var(--border);padding-top:10px">
+        <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px">Return to phone</div>
+        <div style="display:flex;gap:8px">
+          <button id="talkback-btn-${peerId.substring(0,6)}"
+            onclick="REC.toggleTalkback('${peerId}', this)"
+            style="flex:1;padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            🎙 Talkback <span style="font-size:.6rem;color:var(--subtle)">(hold)</span>
+          </button>
+          <button id="vidreturn-btn-${peerId.substring(0,6)}"
+            onclick="REC.toggleVideoReturn('${peerId}', this)"
+            style="flex:1;padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer">
+            📺 Video return
+          </button>
+        </div>
+        <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted);margin-top:6px;line-height:1.6">
+          Talkback sends studio mic to phone. Video return sends studio webcam — uses extra bandwidth.
+        </div>
+      </div>
+    `;
+
+    // Insert controller below the cam grid
+    const camGrid = $('cam-grid');
+    camGrid.parentNode.insertBefore(ctrl, camGrid.nextSibling);
   },
 
   sendFlip(peerId) {
@@ -2193,6 +2287,7 @@ const REC = {
 
   removePhone(peerId) {
     $(`cam-tile-${peerId}`)?.remove();
+    $(`phone-ctrl-${peerId}`)?.remove();
     this.phonePeers?.get(peerId)?.close();
     this.phonePeers?.delete(peerId);
     this.phoneCams.delete(peerId);
@@ -2460,43 +2555,66 @@ const REC = {
     return sdp.replace(new RegExp('(a=rtpmap:' + pt + ' opus/48000/2\r\n)'), '$1a=fmtp:' + pt + ' ' + params + '\r\n');
   },
 
-  async setAudioQuality(preset, btn) {
+  async setAudioQuality(preset, btn, peerId) {
     this.currentQuality = preset;
     const p = this.audioQualityPresets[preset];
-    document.querySelectorAll('.quality-btn').forEach(b => {
-      b.style.background = 'var(--panel2)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--body)';
-    });
+    const shortId = peerId ? peerId.substring(0,6) : null;
+
+    // Update buttons in this phone's controller only
+    const scope = peerId ? $('phone-ctrl-' + peerId) : document;
+    if (scope) {
+      scope.querySelectorAll('.quality-btn').forEach(b => {
+        b.style.background = 'var(--panel2)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--body)';
+      });
+    }
     if (btn) { btn.style.background = p.color + '18'; btn.style.borderColor = p.color; btn.style.color = p.color; }
-    const qualEl = $('quality-current');
+
+    // Update label
+    const qualEl = shortId ? $('q-current-' + shortId) : null;
     if (qualEl) { qualEl.textContent = p.label; qualEl.style.color = p.color; }
-    if (!this.phonePeers?.size) { toast('Quality set — applies to next connection'); return; }
-    for (const [peerId, pc] of this.phonePeers) {
+
+    // Renegotiate — single peer or all peers
+    const peers = peerId
+      ? (this.phonePeers?.get(peerId) ? [[peerId, this.phonePeers.get(peerId)]] : [])
+      : [...(this.phonePeers || new Map())];
+
+    if (!peers.length) { toast('Quality set — applies to next connection'); return; }
+
+    for (const [pid, pc] of peers) {
       if (pc.connectionState !== 'connected') continue;
       try {
         const offer = await pc.createOffer();
         const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP(offer.sdp, preset) });
         await pc.setLocalDescription(hqOffer);
-        this.sigSend({ type:'offer', sdp:hqOffer.sdp, fromPeerId:this.studioPeerId, targetPeerId:peerId });
+        this.sigSend({ type:'offer', sdp:hqOffer.sdp, fromPeerId:this.studioPeerId, targetPeerId:pid });
       } catch(e) { console.warn('[Quality] Renegotiation failed:', e.message); }
     }
     toast('Audio quality: ' + p.label + ' (' + Math.round(p.bitrate/1000) + 'kbps)');
   },
 
-  autoSelectQuality() {
-    const rtt = this._lastRTT || 999;
+  autoSelectQuality(peerId) {
+    const shortId = peerId ? peerId.substring(0,6) : null;
+    const rtt = (shortId && this._peerRTT?.[shortId]) || this._lastRTT || 999;
     const preset = rtt < 80 ? 'studio' : rtt < 150 ? 'high' : rtt < 300 ? 'medium' : 'voice';
-    const btn = document.querySelector('.quality-btn[data-preset="' + preset + '"]');
-    this.setAudioQuality(preset, btn);
+    const scope  = peerId ? $('phone-ctrl-' + peerId) : document;
+    const btn    = scope?.querySelector('.quality-btn[data-preset="' + preset + '"]');
+    this.setAudioQuality(preset, btn, peerId);
   },
 
-  updateQualityStats(rtt) {
+  updateQualityStats(rtt, peerId) {
     this._lastRTT = rtt;
-    const latEl = $('quality-latency');
-    if (latEl) { latEl.textContent = rtt + ' ms'; latEl.style.color = rtt < 80 ? 'var(--green)' : rtt < 300 ? 'var(--amber)' : 'var(--red)'; }
-    const recEl = $('quality-recommended');
-    if (recEl) {
-      const rec = rtt < 80 ? ['Studio','var(--teal)'] : rtt < 150 ? ['High','var(--green)'] : rtt < 300 ? ['Medium','var(--amber)'] : ['Voice','var(--subtle)'];
-      recEl.textContent = rec[0]; recEl.style.color = rec[1];
+    const shortId = peerId ? peerId.substring(0,6) : null;
+    if (!this._peerRTT) this._peerRTT = {};
+    if (shortId) this._peerRTT[shortId] = rtt;
+
+    const color = rtt < 80 ? 'var(--green)' : rtt < 300 ? 'var(--amber)' : 'var(--red)';
+    const rec   = rtt < 80 ? ['Studio','var(--teal)'] : rtt < 150 ? ['High','var(--green)'] : rtt < 300 ? ['Medium','var(--amber)'] : ['Voice','var(--subtle)'];
+
+    if (shortId) {
+      const latEl = $('q-latency-' + shortId);
+      const recEl = $('q-rec-'     + shortId);
+      if (latEl) { latEl.textContent = rtt + ' ms'; latEl.style.color = color; }
+      if (recEl) { recEl.textContent = rec[0]; recEl.style.color = rec[1]; }
     }
   },
 

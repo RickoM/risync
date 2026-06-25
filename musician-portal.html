@@ -81,6 +81,8 @@ input:focus,select:focus{border-color:var(--amber)}
   overflow:hidden;position:relative;margin-bottom:14px;
 }
 .video-box video{width:100%;height:100%;object-fit:cover;}
+#pip-row > div:hover { opacity:.85; transform:scale(.98); transition:all .15s; }
+#pip-phone, #pip-studio { transition: border-color .2s; }
 .focus-ring{
   position:absolute;width:54px;height:54px;border:2px solid var(--amber);
   border-radius:50%;pointer-events:none;transform:translate(-50%,-50%) scale(.75);
@@ -270,12 +272,45 @@ input:focus,select:focus{border-color:var(--amber)}
     <div class="pill"><div class="pill-dot" id="cam-dot"></div><span id="cam-label">Camera</span></div>
     <div class="pill"><div class="pill-dot" id="mic-dot"></div><span id="mic-label">Mic</span></div>
   </div>
-  <div class="video-box">
-    <video id="local-video" autoplay muted playsinline></video>
-    <div class="focus-ring" id="focus-ring"></div>
-    <div class="cam-label" id="cam-label-overlay">Your camera</div>
-    <button class="cam-tools-toggle" id="cam-tools-toggle">Zoom</button>
-    <button class="flip-btn" id="flip-btn">⟳ Flip</button>
+  <!-- Multi-view container: primary + pip thumbnails -->
+  <div id="video-stage" style="position:relative;width:100%;margin-bottom:12px">
+
+    <!-- Primary view -->
+    <div class="video-box" id="primary-view" style="cursor:default">
+      <video id="local-video" autoplay muted playsinline></video>
+      <div class="focus-ring" id="focus-ring"></div>
+      <div class="cam-label" id="cam-label-overlay">Your camera</div>
+      <button class="cam-tools-toggle" id="cam-tools-toggle">Zoom</button>
+      <button class="flip-btn" id="flip-btn">⟳ Flip</button>
+    </div>
+
+    <!-- PIP thumbnails row — shown when studio sends video return -->
+    <div id="pip-row" style="display:none;flex-direction:row;gap:6px;margin-top:6px">
+      <!-- Phone cam thumbnail -->
+      <div id="pip-phone" onclick="VIEWS.swapToPhone()"
+        style="flex:1;position:relative;aspect-ratio:4/3;border-radius:8px;overflow:hidden;border:2px solid var(--border);cursor:pointer;background:#000">
+        <video id="pip-phone-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
+        <div style="position:absolute;bottom:4px;left:6px;font-family:var(--fm);font-size:.55rem;color:#fff;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:8px">
+          📷 Your cam
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(240,160,48,.15);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s" 
+          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+          <span style="font-size:1.2rem">⇱</span>
+        </div>
+      </div>
+      <!-- Studio return thumbnail -->
+      <div id="pip-studio" onclick="VIEWS.swapToStudio()"
+        style="flex:1;position:relative;aspect-ratio:4/3;border-radius:8px;overflow:hidden;border:2px solid var(--amber);cursor:pointer;background:#000">
+        <video id="pip-studio-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>
+        <div style="position:absolute;bottom:4px;left:6px;font-family:var(--fm);font-size:.55rem;color:var(--amber);background:rgba(0,0,0,.6);padding:2px 6px;border-radius:8px">
+          📺 Studio
+        </div>
+        <div style="position:absolute;inset:0;background:rgba(240,160,48,.15);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s"
+          onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+          <span style="font-size:1.2rem">⇱</span>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="camera-tools" id="camera-tools">
     <div class="tool-row">
@@ -534,9 +569,29 @@ function createPeerConnection(targetPeerId, initiate){
   S.localStream.getAudioTracks().forEach(track => pc.addTrack(track, S.localStream));
   const videoTrack = outboundVideoTrack();
   if (videoTrack) pc.addTrack(videoTrack, S.localStream);
+
   pc.onicecandidate = e => {
     if(e.candidate) send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
   };
+
+  // Handle incoming tracks from studio (talkback audio + video return)
+  pc.ontrack = e => {
+    const track = e.track;
+    console.log('[Portal] Received track from studio:', track.kind);
+    if (track.kind === 'audio') {
+      // Studio talkback — play through phone speaker
+      const audio = document.getElementById('studio-talkback') || createTalkbackElement();
+      const stream = e.streams[0] || new MediaStream([track]);
+      audio.srcObject = stream;
+      audio.play().catch(() => {});
+      chatLog('', '🎙 Studio talkback active', true);
+    }
+    if (track.kind === 'video') {
+      // Studio video return — show in return preview
+      showVideoReturn(e.streams[0] || new MediaStream([track]));
+    }
+  };
+
   pc.onconnectionstatechange = () => {
     if(pc.connectionState === 'connected') chatLog('', 'Streaming to studio', true);
     if(pc.connectionState === 'failed') { pc.restartIce(); }
@@ -548,6 +603,20 @@ function createPeerConnection(targetPeerId, initiate){
     });
   }
   return pc;
+}
+
+function createTalkbackElement() {
+  const audio = document.createElement('audio');
+  audio.id = 'studio-talkback';
+  audio.autoplay = true;
+  document.body.appendChild(audio);
+  return audio;
+}
+
+function showVideoReturn(stream) {
+  // Use VIEWS multi-view system
+  VIEWS.activateStudio(stream);
+  chatLog('', '📺 Studio video return — tap thumbnail to swap view', true);
 }
 
 function setHighQualityOpus(sdp) {
@@ -1086,6 +1155,73 @@ function sendChat(){
 }
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+// ── MULTI-VIEW CONTROLLER ────────────────────────────────────
+const VIEWS = {
+  // 'phone' or 'studio' — which is in primary slot
+  primary: 'phone',
+  studioStream: null,
+
+  // Called when studio video return arrives
+  activateStudio(stream) {
+    this.studioStream = stream;
+
+    // Show pip row
+    $('pip-row').style.display = 'flex';
+
+    // Put studio in pip thumbnail
+    $('pip-studio-video').srcObject = stream;
+    $('pip-studio-video').play().catch(() => {});
+
+    // Mirror phone cam in pip thumbnail too
+    $('pip-phone-video').srcObject = S.localStream;
+    $('pip-phone-video').play().catch(() => {});
+  },
+
+  // Deactivate studio return — back to single view
+  deactivateStudio() {
+    this.studioStream = null;
+    $('pip-row').style.display = 'none';
+    // Ensure phone cam is back in primary
+    this.setPrimary('phone');
+  },
+
+  setPrimary(which) {
+    this.primary = which;
+    const primaryVid = $('local-video');
+    const pipPhone   = $('pip-phone');
+    const pipStudio  = $('pip-studio');
+
+    if (which === 'phone') {
+      // Phone cam → primary
+      primaryVid.srcObject = S.localStream;
+      primaryVid.muted     = true;
+      $('cam-label-overlay').textContent = S.facingMode === 'user' ? '🤳 Front cam' : '📷 Rear cam';
+      // Studio → pip thumbnail
+      $('pip-studio-video').srcObject = this.studioStream;
+      $('pip-phone-video').srcObject  = null;
+      pipPhone.style.display  = 'none';   // no need for phone pip when phone is primary
+      pipStudio.style.display = 'flex';
+      pipStudio.style.border  = '2px solid var(--amber)';
+      pipPhone.style.border   = '2px solid var(--border)';
+    } else {
+      // Studio → primary (unmuted so musician hears studio audio)
+      primaryVid.srcObject = this.studioStream;
+      primaryVid.muted     = false;
+      $('cam-label-overlay').textContent = '📺 Studio view';
+      // Phone cam → pip thumbnail
+      $('pip-phone-video').srcObject  = S.localStream;
+      $('pip-studio-video').srcObject = null;
+      pipPhone.style.display  = 'flex';
+      pipStudio.style.display = 'none';
+      pipPhone.style.border   = '2px solid var(--teal)';
+      pipStudio.style.border  = '2px solid var(--border)';
+    }
+  },
+
+  swapToPhone()  { this.setPrimary('phone');  },
+  swapToStudio() { this.setPrimary('studio'); },
+};
 
 // LEAVE
 $('leave-btn').addEventListener('click', ()=>{
