@@ -2005,29 +2005,51 @@ const REC = {
   },
 
   // Toggle studio video return to phone
-  async sendVideoReturn(peerId, enabled) {
+  async sendVideoReturn(peerId, enabled, sourceId) {
     const pc      = this.phonePeers?.get(peerId);
     const senders = this.talkbackSenders?.get(peerId);
-    if (!pc || !senders) return;
 
-    if (enabled && this.videoStream) {
-      const videoTrack = this.videoStream.getVideoTracks()[0];
-      if (videoTrack) {
+    console.log('[VideoReturn] pc:', !!pc, 'senders:', !!senders, 'videoStream:', !!this.videoStream, 'enabled:', enabled);
+
+    if (!pc) { toast('Phone not connected'); return; }
+    if (!senders) { toast('No talkback senders — reconnect phone'); return; }
+
+    if (enabled) {
+      // Get stream from sourceId
+      let videoStream = this.videoStream; // default webcam
+      if (sourceId && sourceId.startsWith('phone-')) {
+        const pid = sourceId.replace('phone-', '');
+        const vid = $('phone-vid-' + pid);
+        if (vid?.srcObject) videoStream = vid.srcObject;
+      }
+      if (!videoStream) { toast('No studio webcam — start webcam first in Record tab'); return; }
+
+      const videoTrack = videoStream.getVideoTracks()[0];
+      if (!videoTrack) { toast('No video track on webcam stream'); return; }
+
+      try {
         if (senders.video) {
-          senders.video.replaceTrack(videoTrack);
+          await senders.video.replaceTrack(videoTrack);
         } else {
-          senders.video = pc.addTrack(videoTrack, this.videoStream);
+          senders.video = pc.addTrack(videoTrack, videoStream);
         }
-        // Renegotiate
-        const offer = await pc.createOffer();
-        const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP(offer.sdp, this.currentQuality||'studio') });
+        // Renegotiate with phone
+        const offer   = await pc.createOffer();
+        const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP ? this.buildOpusSDP(offer.sdp, this.currentQuality||'studio') : offer.sdp });
         await pc.setLocalDescription(hqOffer);
         this.sigSend({ type:'offer', sdp:hqOffer.sdp, fromPeerId:this.studioPeerId, targetPeerId:peerId });
-        toast('Studio video sent to phone');
+        toast('📺 Studio video → phone');
+        console.log('[VideoReturn] Sent offer with video track:', videoTrack.label);
+      } catch(e) {
+        toast('Video return error: ' + e.message);
+        console.error('[VideoReturn]', e);
       }
-    } else if (!enabled && senders.video) {
-      senders.video.replaceTrack(null);
-      toast('Studio video return stopped');
+
+    } else {
+      if (senders.video) {
+        await senders.video.replaceTrack(null).catch(() => {});
+        toast('📺 Video return stopped');
+      }
     }
   },
 
@@ -2055,15 +2077,82 @@ const REC = {
   },
 
   // Toggle video return on/off
-  toggleVideoReturn(peerId, btn) {
-    const active = btn.dataset.active === 'true';
-    const next   = !active;
-    btn.dataset.active   = next;
+  async toggleVideoReturn(peerId, btn) {
+    const active  = btn.dataset.active === 'true';
+    const next    = !active;
+    const shortId = peerId.substring(0,6);
+    btn.dataset.active    = next;
     btn.style.background  = next ? 'rgba(128,96,224,.2)' : 'var(--panel2)';
     btn.style.borderColor = next ? 'var(--violet)'        : 'var(--border)';
     btn.style.color       = next ? 'var(--violet)'        : 'var(--body)';
     btn.textContent       = next ? '📺 Video ON'          : '📺 Video return';
-    this.sendVideoReturn(peerId, next);
+
+    // Show/hide camera source selector
+    const sourcePanel = $('vidreturn-source-' + shortId);
+    if (sourcePanel) sourcePanel.style.display = next ? 'block' : 'none';
+
+    if (next) {
+      // Populate camera list
+      await this.populateReturnCameras(peerId);
+      // Send webcam by default
+      this.sendVideoReturn(peerId, true, 'webcam');
+    } else {
+      this.sendVideoReturn(peerId, false);
+    }
+  },
+
+  // Populate camera source buttons from available streams
+  async populateReturnCameras(peerId) {
+    const shortId  = peerId.substring(0,6);
+    const container = $('vidreturn-cams-' + shortId);
+    if (!container) return;
+
+    const buttons = [];
+
+    // Webcam
+    if (this.videoStream) {
+      buttons.push({ id:'webcam', label:'📷 Webcam', stream: this.videoStream });
+    }
+
+    // Any phone cameras (other phones)
+    this.phonePeers?.forEach((pc, pid) => {
+      if (pid === peerId) return; // don't send phone its own stream
+      const vid = $('phone-vid-' + pid);
+      if (vid?.srcObject) {
+        const name = $('phone-label-' + pid)?.textContent || 'Phone';
+        buttons.push({ id:'phone-' + pid, label:'📱 ' + name, stream: vid.srcObject });
+      }
+    });
+
+    container.innerHTML = buttons.map(b => `
+      <button onclick="REC.setReturnCamera('${peerId}', '${b.id}', this)"
+        style="padding:5px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer">
+        ${b.label}
+      </button>
+    `).join('');
+
+    // Highlight first button as active
+    container.querySelector('button')?.click();
+  },
+
+  // Switch the video return source
+  setReturnCamera(peerId, sourceId, btn) {
+    // Update button styles
+    const shortId = peerId.substring(0,6);
+    $('vidreturn-cams-' + shortId)?.querySelectorAll('button').forEach(b => {
+      b.style.background   = 'var(--panel2)';
+      b.style.borderColor  = 'var(--border)';
+      b.style.color        = 'var(--body)';
+    });
+    btn.style.background   = 'rgba(128,96,224,.2)';
+    btn.style.borderColor  = 'var(--violet)';
+    btn.style.color        = 'var(--violet)';
+
+    this.sendVideoReturn(peerId, true, sourceId);
+
+    // Tell phone which label to show
+    const label = btn.textContent.trim();
+    this.sigSend({ type:'return-label', targetPeerId:peerId, label });
   },
 
   async handlePhoneOffer(fromPeerId, sdp) {
@@ -2268,6 +2357,18 @@ const REC = {
             style="flex:1;padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer">
             📺 Video return
           </button>
+        </div>
+        <!-- Camera source selector for video return -->
+        <div id="vidreturn-source-${peerId.substring(0,6)}" style="display:none;margin-top:8px">
+          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:5px">Return camera source</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="vidreturn-cams-${peerId.substring(0,6)}">
+            <button onclick="REC.setReturnCamera('${peerId}', 'webcam', this)"
+              style="padding:5px 10px;background:var(--violet-glow);border:1px solid var(--violet);border-radius:6px;color:var(--violet);font-family:var(--fm);font-size:.62rem;cursor:pointer">
+              📷 Webcam
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;display:none"><!-- spacer close --></div
         </div>
         <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted);margin-top:6px;line-height:1.6">
           Talkback sends studio mic to phone. Video return sends studio webcam — uses extra bandwidth.
