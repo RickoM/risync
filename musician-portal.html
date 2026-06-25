@@ -93,10 +93,18 @@ input:focus,select:focus{border-color:var(--amber)}
   color:var(--bright);border-radius:8px;padding:6px 10px;
   font-size:.75rem;cursor:pointer;
 }
+.cam-tools-toggle{
+  position:absolute;right:10px;top:48px;
+  background:rgba(8,11,18,.78);border:1px solid var(--border);
+  color:var(--bright);border-radius:8px;padding:7px 10px;
+  font-size:.78rem;cursor:pointer;
+}
 .camera-tools{
   background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:12px;margin-bottom:14px;
+  display:none;
 }
+.camera-tools.open{display:block}
 .tool-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .tool-row:last-child{margin-bottom:0}
 .tool-label{
@@ -250,6 +258,7 @@ input:focus,select:focus{border-color:var(--amber)}
   <div class="video-box">
     <video id="local-video" autoplay muted playsinline></video>
     <div class="cam-label" id="cam-label-overlay">Your camera</div>
+    <button class="cam-tools-toggle" id="cam-tools-toggle">Zoom</button>
     <button class="flip-btn" id="flip-btn">⟳ Flip</button>
   </div>
   <div class="camera-tools" id="camera-tools">
@@ -262,6 +271,7 @@ input:focus,select:focus{border-color:var(--amber)}
       <div class="tool-label">Focus</div>
       <select class="tool-select" id="focus-mode" disabled>
         <option value="continuous">Auto</option>
+        <option value="single-shot">Single</option>
         <option value="manual">Manual</option>
       </select>
     </div>
@@ -382,6 +392,7 @@ $('allow-btn').addEventListener('click', async () => {
     // no mirror
     $('cam-label-overlay').textContent = S.label || S.name;
     updateCameraControls();
+    await requestAutoFocus();
     $('cam-dot').className = 'pill-dot green';
     $('cam-label').textContent = 'Cam live';
     $('mic-dot').className = 'pill-dot green';
@@ -548,6 +559,9 @@ function setupVU(){
 $('mute-btn').addEventListener('click', toggleMic);
 $('cam-btn').addEventListener('click', toggleCam);
 $('flip-btn').addEventListener('click', flipCamera);
+$('cam-tools-toggle').addEventListener('click', () => {
+  $('camera-tools').classList.toggle('open');
+});
 $('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
 $('focus-mode').addEventListener('change', e => setFocusMode(e.target.value));
 $('focus-distance').addEventListener('input', e => setFocusDistance(parseFloat(e.target.value)));
@@ -648,6 +662,24 @@ async function applyCameraAdvanced(values) {
     updateCameraControls();
     return false;
   }
+}
+
+async function requestAutoFocus() {
+  const track = activeVideoTrack();
+  const caps = track?.getCapabilities?.() || {};
+  const modes = caps.focusMode || [];
+  if (!modes.length) return false;
+  const mode = modes.includes('continuous') ? 'continuous'
+    : modes.includes('single-shot') ? 'single-shot'
+    : modes.includes('auto') ? 'auto'
+    : null;
+  if (!mode) return false;
+  const ok = await applyCameraAdvanced({ focusMode: mode });
+  if (ok) {
+    $('focus-mode').value = mode;
+    chatLog('', 'Autofocus enabled', true);
+  }
+  return ok;
 }
 
 function stopDigitalZoom() {
@@ -901,6 +933,7 @@ async function switchCamera(){
     $('local-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
     updateCameraControls();
+    await requestAutoFocus();
     if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
 
     const settings = newTrack.getSettings?.() || {};
@@ -917,6 +950,7 @@ async function switchCamera(){
         $('local-video').srcObject = S.localStream;
         await $('local-video').play().catch(()=>{});
         updateCameraControls();
+        await requestAutoFocus();
         if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
         await Promise.all([...S.peers.values()].map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
