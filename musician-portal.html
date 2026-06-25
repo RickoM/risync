@@ -75,12 +75,59 @@ input:focus,select:focus{border-color:var(--amber)}
   font-size:.78rem;color:var(--body);
 }
 .participant-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
-.video-box{
-  width:100%;aspect-ratio:4/3;border-radius:12px;
-  background:var(--panel);border:1px solid var(--border);
-  overflow:hidden;position:relative;margin-bottom:14px;
+/* ── CAM BLOCK: video left, controls right ── */
+.cam-block {
+  display:flex;gap:0;border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;background:var(--panel);margin-bottom:0;
 }
-.video-box video{width:100%;height:100%;object-fit:cover;}
+.cam-video {
+  flex:1;position:relative;aspect-ratio:4/3;background:#000;min-width:0;
+}
+.cam-video video { width:100%;height:100%;object-fit:cover;display:block; }
+.cam-controls-col {
+  display:flex;flex-direction:column;gap:0;
+  background:rgba(8,11,18,.85);border-left:1px solid var(--border);
+  min-width:58px;
+}
+.cam-ctrl-btn {
+  flex:1;padding:8px 6px;border:none;border-bottom:1px solid var(--border);
+  background:transparent;color:var(--bright);font-family:var(--fd);font-weight:700;
+  font-size:.65rem;cursor:pointer;text-align:center;transition:background .15s;
+}
+.cam-ctrl-btn:last-child { border-bottom:none; }
+.cam-ctrl-btn:hover { background:rgba(255,255,255,.07); }
+.cam-ctrl-btn.off { color:var(--red); }
+.cam-ctrl-btn.active { color:var(--amber); }
+
+/* ── CAM INFO BAR: below phone cam ── */
+.cam-info-bar {
+  display:flex;border:1px solid var(--border);border-top:none;
+  border-radius:0 0 12px 12px;overflow:hidden;background:var(--surface);
+  margin-bottom:10px;
+}
+.cam-info-left { flex:1;display:flex;flex-direction:column;gap:0;min-width:0; }
+.cam-info-row {
+  display:flex;align-items:center;gap:6px;padding:6px 10px;
+  border-bottom:1px solid var(--border);
+}
+.cam-info-row:last-child { border-bottom:none; }
+.cam-info-label {
+  font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0;
+}
+.cam-info-right {
+  display:flex;flex-direction:column;justify-content:center;gap:4px;
+  padding:6px 8px;border-left:1px solid var(--border);
+  background:rgba(8,11,18,.5);min-width:80px;
+}
+.cam-stat {
+  font-family:var(--fm);font-size:.6rem;color:var(--subtle);
+  display:flex;justify-content:space-between;gap:4px;
+}
+.cam-stat-val { color:var(--bright); }
+
+/* Video box kept for focus-ring etc */
+.video-box { position:relative; }
+
 #dual-view { display:none; flex-direction:column; gap:10px; width:100%; }
 #dual-view.active { display:flex; }
 .dual-video-panel{
@@ -304,94 +351,158 @@ input:focus,select:focus{border-color:var(--amber)}
 
     <!-- Single camera view (default) -->
     <div id="single-view" style="display:block">
-      <div class="video-box">
-        <video id="local-video" autoplay muted playsinline></video>
-        <div class="focus-ring" id="focus-ring"></div>
-        <div class="cam-label" id="cam-label-overlay">Phone Cam</div>
-        <!-- Mic gain control overlay — above meter -->
-        <div style="position:absolute;bottom:60px;left:8px;right:8px;z-index:3">
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
-            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">GAIN</span>
-            <input type="range" id="mic-gain-slider" min="0" max="4" step="0.05" value="1"
-              style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer;pointer-events:all"
-              oninput="setMicGain(this.value)">
-            <span id="mic-gain-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
-            <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
-              style="font-family:var(--fm);font-size:.55rem;padding:2px 6px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;pointer-events:all">⚡</button>
-          </div>
-        </div>
-
-        <!-- Mic level overlay — bottom left of video -->
-        <div id="mic-overlay" style="position:absolute;bottom:36px;left:8px;right:8px;z-index:3;pointer-events:none">
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
-            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">MIC</span>
-            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
-              <div id="mic-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:0">
+        <!-- Row 1: Video + controls -->
+        <tr>
+          <td style="position:relative;width:100%">
+            <div style="position:relative;aspect-ratio:4/3;background:#000;overflow:hidden">
+              <video id="local-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>
+              <div class="focus-ring" id="focus-ring"></div>
+              <div class="cam-label" id="cam-label-overlay">Phone Cam</div>
             </div>
-            <span id="mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
-          </div>
-        </div>
-        <div class="cam-side-controls">
-          <button class="cam-side-btn" id="cam-side-cam" type="button">Cam</button>
-          <button class="cam-side-btn" id="cam-side-mic" type="button">Mic</button>
-          <button class="cam-side-btn" id="cam-tools-toggle" type="button">Zoom</button>
-          <button class="cam-side-btn" id="flip-btn" type="button">Flip</button>
-        </div>
-      </div>
+          </td>
+          <td style="vertical-align:top;background:rgba(8,11,18,.85);border-left:1px solid var(--border);width:58px;min-width:58px">
+            <div style="display:flex;flex-direction:column;height:100%">
+              <button class="cam-ctrl-btn" id="cam-side-cam" type="button">Cam</button>
+              <button class="cam-ctrl-btn" id="cam-side-mic" type="button">Mic</button>
+              <button class="cam-ctrl-btn" id="cam-tools-toggle" type="button">Zoom</button>
+              <button class="cam-ctrl-btn" id="flip-btn" type="button">Flip</button>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 2: Gain slider | Latency -->
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 10px;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">GAIN</span>
+              <input type="range" id="mic-gain-slider" min="0" max="4" step="0.05" value="1"
+                style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
+                oninput="setMicGain(this.value)">
+              <span id="mic-gain-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
+              <button onclick="autoGainMic()"
+                style="font-family:var(--fm);font-size:.58rem;padding:2px 8px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;flex-shrink:0">⚡</button>
+            </div>
+          </td>
+          <td rowspan="2" style="border-left:1px solid var(--border);padding:8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:58px">
+            <div style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);display:flex;flex-direction:column;gap:5px;text-align:center">
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">LATENCY</div><div id="stat-latency" style="color:var(--bright);font-size:.65rem">— ms</div></div>
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">SIGNAL</div><div id="stat-signal" style="color:var(--bright);font-size:.65rem">—</div></div>
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">QUALITY</div><div id="stat-quality" style="color:var(--bright);font-size:.65rem">—</div></div>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 3: Mic level -->
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 10px;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">MIC</span>
+              <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden">
+                <div id="mic-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+              </div>
+              <span id="mic-db" style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+            </div>
+          </td>
+        </tr>
+      </table>
     </div>
 
-    <!-- Dual view: phone on top, studio return below (shown when studio sends video return) -->
+    <!-- Dual view: phone on top, studio return below -->
     <div id="dual-view" style="display:none;gap:8px">
 
-      <!-- Phone cam panel — full width -->
-      <div class="dual-video-panel" style="border:2px solid var(--teal)">
-        <video id="dual-phone-video" autoplay muted playsinline></video>
-        <div class="focus-ring" id="focus-ring-dual"></div>
-        <div style="position:absolute;top:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--teal);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
-          📷 Phone Cam
-        </div>
-        <!-- Mic gain overlay in dual view -->
-        <div style="position:absolute;bottom:60px;left:8px;right:8px;z-index:3">
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
-            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">GAIN</span>
-            <input type="range" id="mic-gain-slider-dual" min="0" max="4" step="0.05" value="1"
-              style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer;pointer-events:all"
-              oninput="setMicGain(this.value)">
-            <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
-            <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
-              style="font-family:var(--fm);font-size:.55rem;padding:2px 6px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;pointer-events:all">⚡</button>
+      <!-- Phone cam block -->
+      <div>
+        <div class="cam-block">
+          <div class="cam-video" style="aspect-ratio:16/9">
+            <video id="dual-phone-video" autoplay muted playsinline></video>
+            <div class="focus-ring" id="focus-ring-dual"></div>
+            <div class="cam-label">📷 Phone Cam</div>
+          </div>
+          <div class="cam-controls-col">
+            <button class="cam-ctrl-btn" id="cam-side-cam-dual" type="button">Cam</button>
+            <button class="cam-ctrl-btn" id="cam-side-mic-dual" type="button">Mic</button>
+            <button class="cam-ctrl-btn" id="cam-tools-toggle-dual" type="button">Zoom</button>
+            <button class="cam-ctrl-btn" id="flip-btn-dual" type="button">Flip</button>
           </div>
         </div>
-        <!-- Mic level overlay in dual view -->
-        <div style="position:absolute;bottom:36px;left:8px;right:8px;z-index:3;pointer-events:none">
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
-            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">MIC</span>
-            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
-              <div id="mic-meter-dual" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+        <!-- Info bar below phone cam -->
+        <div class="cam-info-bar">
+          <div class="cam-info-left">
+            <div class="cam-info-row">
+              <span class="cam-info-label">GAIN</span>
+              <input type="range" id="mic-gain-slider-dual" min="0" max="4" step="0.05" value="1"
+                style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
+                oninput="setMicGain(this.value)">
+              <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
+              <button onclick="autoGainMic()"
+                style="font-family:var(--fm);font-size:.58rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer">⚡</button>
             </div>
-            <span id="mic-db-dual" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+            <div class="cam-info-row">
+              <span class="cam-info-label">MIC</span>
+              <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden">
+                <div id="mic-meter-dual" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+              </div>
+              <span id="mic-db-dual" style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+            </div>
           </div>
-        </div>
-        <div class="cam-side-controls">
-          <button class="cam-side-btn" id="cam-side-cam-dual" type="button">Cam</button>
-          <button class="cam-side-btn" id="cam-side-mic-dual" type="button">Mic</button>
-          <button class="cam-side-btn" id="cam-tools-toggle-dual" type="button">Zoom</button>
-          <button class="cam-side-btn" id="flip-btn-dual" type="button">Flip</button>
+          <div class="cam-info-right">
+            <div class="cam-stat"><span>Latency</span><span class="cam-stat-val" id="stat-latency-dual">— ms</span></div>
+            <div class="cam-stat"><span>Signal</span><span class="cam-stat-val" id="stat-signal-dual">—</span></div>
+            <div class="cam-stat"><span>Quality</span><span class="cam-stat-val" id="stat-quality-dual">—</span></div>
+          </div>
         </div>
       </div>
 
-      <!-- Studio return panel — full width below -->
-      <div class="dual-video-panel" style="border:2px solid var(--amber)">
-        <video id="studio-return-video" autoplay playsinline></video>
-        <div style="position:absolute;top:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--amber);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
-          📺 <span id="studio-return-label">Studio Cam</span>
-        </div>
-        <button onclick="VIEWS.deactivateStudio()"
-          style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:1px solid var(--border);color:var(--subtle);border-radius:6px;padding:4px 8px;font-size:.65rem;cursor:pointer">
-          ✕
-        </button>
-      </div>
-    </div>
+      <!-- Studio return block -->
+      <table style="width:100%;border-collapse:collapse;border:1px solid var(--amber);border-radius:12px;overflow:hidden;margin-bottom:0">
+        <!-- Row 1: Video + controls -->
+        <tr>
+          <td style="position:relative;width:100%">
+            <div style="position:relative;aspect-ratio:16/9;background:#000;overflow:hidden">
+              <video id="studio-return-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>
+              <div class="cam-label" style="color:var(--amber)">📺 <span id="studio-return-label">Studio Cam</span></div>
+            </div>
+          </td>
+          <td style="vertical-align:top;background:rgba(8,11,18,.85);border-left:1px solid var(--border);width:58px;min-width:58px">
+            <div style="display:flex;flex-direction:column;height:100%">
+              <button class="cam-ctrl-btn" id="studio-cam-btn" type="button" onclick="toggleStudioVideo(this)">Cam</button>
+              <button class="cam-ctrl-btn" id="studio-mic-btn" type="button" onclick="toggleStudioAudio(this)">Mic</button>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 2: Speaker level -->
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 10px;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">VOL</span>
+              <input type="range" id="studio-vol-slider" min="0" max="1" step="0.05" value="0.8"
+                style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
+                oninput="setStudioVolume(this.value)">
+              <span id="studio-vol-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">80%</span>
+            </div>
+          </td>
+          <td rowspan="2" style="border-left:1px solid var(--border);padding:8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:58px">
+            <div style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);display:flex;flex-direction:column;gap:5px;text-align:center">
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">LATENCY</div><div id="stat-latency-dual" style="color:var(--bright);font-size:.65rem">— ms</div></div>
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">SIGNAL</div><div id="stat-signal-dual" style="color:var(--bright);font-size:.65rem">—</div></div>
+              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">QUALITY</div><div id="stat-quality-dual" style="color:var(--bright);font-size:.65rem">—</div></div>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 3: Level indicator -->
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 10px;background:var(--surface)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">LVL</span>
+              <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden">
+                <div id="studio-level-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+              </div>
+              <span id="studio-level-db" style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+</div>
   </div>
   <div class="camera-tools" id="camera-tools">
     <div class="tool-row">
@@ -675,7 +786,19 @@ function createPeerConnection(targetPeerId, initiate){
   };
 
   pc.onconnectionstatechange = () => {
-    if(pc.connectionState === 'connected') chatLog('', 'Streaming to studio', true);
+    if(pc.connectionState === 'connected') {
+      chatLog('', 'Streaming to studio', true);
+      // Poll RTT every 3s for stat bars
+      setInterval(async () => {
+        try {
+          const stats = await pc.getStats();
+          stats.forEach(r => {
+            if (r.type==='candidate-pair' && r.nominated && r.currentRoundTripTime!=null)
+              updateLatencyStats(Math.round(r.currentRoundTripTime*1000));
+          });
+        } catch(e){}
+      }, 3000);
+    }
     if(pc.connectionState === 'failed') { pc.restartIce(); }
   };
   if(initiate){
@@ -1391,6 +1514,85 @@ const VIEWS = {
   },
 };
 
+// ── STUDIO RETURN CONTROLS ────────────────────────────────────
+let studioAudioMuted = false;
+let studioVideoOff   = false;
+let studioLevelCtx   = null;
+let studioLevelFrame = null;
+
+function toggleStudioAudio(btn) {
+  studioAudioMuted = !studioAudioMuted;
+  const vid = $('studio-return-video');
+  if (vid) vid.muted = studioAudioMuted;
+  btn.textContent = studioAudioMuted ? 'Mic 🔇' : 'Mic';
+  btn.classList.toggle('off', studioAudioMuted);
+}
+
+function toggleStudioVideo(btn) {
+  studioVideoOff = !studioVideoOff;
+  const vid = $('studio-return-video');
+  if (vid) {
+    vid.style.visibility = studioVideoOff ? 'hidden' : 'visible';
+  }
+  btn.textContent = studioVideoOff ? 'Cam 🚫' : 'Cam';
+  btn.classList.toggle('off', studioVideoOff);
+}
+
+function setStudioVolume(val) {
+  const vid = $('studio-return-video');
+  if (vid) vid.volume = parseFloat(val);
+  const el = $('studio-vol-val');
+  if (el) el.textContent = Math.round(val * 100) + '%';
+}
+
+function startStudioLevelMeter(stream) {
+  try {
+    studioLevelCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src  = studioLevelCtx.createMediaStreamSource(stream);
+    const analyser = studioLevelCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    function draw() {
+      studioLevelFrame = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const pct = Math.min(100, avg/128*200);
+      const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '-∞';
+      const m = $('studio-level-meter'); if(m) m.style.width = pct+'%';
+      const d = $('studio-level-db');   if(d) d.textContent  = db+'dB';
+    }
+    draw();
+    if (studioLevelCtx.state === 'suspended') studioLevelCtx.resume();
+  } catch(e) { console.warn('Studio level meter:', e.message); }
+}
+
+// Update latency stats in info bars
+function updateLatencyStats(rtt) {
+  const color = rtt < 80 ? 'var(--green)' : rtt < 200 ? 'var(--amber)' : 'var(--red)';
+  const signal = rtt < 80 ? 'Good' : rtt < 200 ? 'Fair' : 'Poor';
+  ['stat-latency','stat-latency-dual'].forEach(id => {
+    const el = $(id); if(el){ el.textContent = rtt+'ms'; el.style.color = color; }
+  });
+  ['stat-signal','stat-signal-dual'].forEach(id => {
+    const el = $(id); if(el){ el.textContent = signal; el.style.color = color; }
+  });
+}
+
+
+
+// Update latency stats in info bars
+function updateLatencyStats(rtt) {
+  const color = rtt < 80 ? 'var(--green)' : rtt < 200 ? 'var(--amber)' : 'var(--red)';
+  const signal = rtt < 80 ? 'Good' : rtt < 200 ? 'Fair' : 'Poor';
+  ['stat-latency','stat-latency-dual'].forEach(id => {
+    const el = $(id); if(el){ el.textContent = rtt+'ms'; el.style.color = color; }
+  });
+  ['stat-signal','stat-signal-dual'].forEach(id => {
+    const el = $(id); if(el){ el.textContent = signal; el.style.color = color; }
+  });
+}
+
 // ── MIC GAIN ──────────────────────────────────────────────────
 let micGainNode = null;
 
@@ -1425,6 +1627,11 @@ function setMicGain(val) {
   if (micGainNode) micGainNode.gain.value = v;
   const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
   const label = (db > 0 ? '+' : '') + db + ' dB';
+  // Update quality stat display
+  ['stat-quality','stat-quality-dual'].forEach(id => {
+    const el = $(id);
+    if(el) el.textContent = v > 3 ? 'Hi' : v > 1.5 ? 'Med' : v > 0.5 ? 'Lo' : 'Min';
+  });
   // Update both single and dual view sliders and labels
   const s1 = $('mic-gain-slider');     if (s1) s1.value = v;
   const s2 = $('mic-gain-slider-dual'); if (s2) s2.value = v;
