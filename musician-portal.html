@@ -477,6 +477,8 @@ input:focus,select:focus{border-color:var(--amber)}
             <div style="display:flex;flex-direction:column;height:100%">
               <button class="cam-ctrl-btn" id="studio-cam-btn" type="button" onclick="toggleStudioVideo(this)">Cam</button>
               <button class="cam-ctrl-btn" id="studio-mic-btn" type="button" onclick="toggleStudioAudio(this)">Mic</button>
+              <button class="cam-ctrl-btn" id="studio-play-btn" type="button" onclick="forcePlayStudioAudio(this)"
+                style="color:var(--amber);border-top:1px solid var(--border)">▶ Play</button>
             </div>
           </td>
         </tr>
@@ -1607,6 +1609,23 @@ let studioAudioMuted = false;
 let studioVideoOff   = false;
 let studioLevelCtx   = null;
 let studioLevelFrame = null;
+
+function forcePlayStudioAudio(btn) {
+  const audioEl = document.getElementById('studio-audio-return');
+  if (!audioEl) {
+    chatLog('', 'No audio element yet — waiting for studio to connect', true);
+    return;
+  }
+  audioEl.muted = false;
+  audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
+  audioEl.play()
+    .then(() => {
+      btn.textContent = '🔊 On';
+      btn.style.color = 'var(--green)';
+      chatLog('', '🔊 Studio audio playing', true);
+    })
+    .catch(e => chatLog('', 'Play failed: ' + e.message, true));
+}
 
 function toggleStudioAudio(btn) {
   studioAudioMuted = !studioAudioMuted;
