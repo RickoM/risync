@@ -93,6 +93,8 @@ input:focus,select:focus{border-color:var(--amber)}
   flex:1;padding:8px 6px;border:none;border-bottom:1px solid var(--border);
   background:transparent;color:var(--bright);font-family:var(--fd);font-weight:700;
   font-size:.65rem;cursor:pointer;text-align:center;transition:background .15s;
+  pointer-events:all;-webkit-tap-highlight-color:rgba(255,255,255,.1);
+  user-select:none;-webkit-user-select:none;
 }
 .cam-ctrl-btn:last-child { border-bottom:none; }
 .cam-ctrl-btn:hover { background:rgba(255,255,255,.07); }
@@ -783,26 +785,45 @@ function createPeerConnection(targetPeerId, initiate){
     if(e.candidate) send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
   };
 
-  // Handle incoming tracks from studio (talkback audio + video return)
+  // Handle incoming tracks from studio (audio + video return)
   pc.ontrack = e => {
     const track = e.track;
-    console.log('[Portal] Received track from studio:', track.kind);
-    // Both audio and video arrive — attach full stream to studio-return-video
+    const stream = e.streams[0];
+    console.log('[Portal] Track from studio:', track.kind, 'stream tracks:', stream?.getTracks().length);
+
+    if (!stream) return;
+
     if (track.kind === 'video') {
-      const stream = e.streams[0] || new MediaStream([track]);
+      // Video arrived — attach full stream (includes audio) to studio-return-video
       showVideoReturn(stream);
     }
+
     if (track.kind === 'audio') {
-      // If video already set srcObject, add audio track to it
+      // Always use a dedicated audio element — works even when video not visible
+      let audioEl = document.getElementById('studio-audio-return');
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.id = 'studio-audio-return';
+        audioEl.autoplay = true;
+        audioEl.muted = false;
+        document.body.appendChild(audioEl);
+      }
+      audioEl.srcObject = stream;
+      audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
+      audioEl.play().catch(() => {
+        // Autoplay blocked — unlock on first tap
+        document.addEventListener('click', () => {
+          audioEl.muted = false;
+          audioEl.play().catch(() => {});
+        }, { once: true });
+        chatLog('', '🔊 Tap screen to enable studio audio', true);
+      });
+
+      // Also attach to video element if visible
       const vid = $('studio-return-video');
       if (vid && vid.srcObject) {
-        vid.srcObject.addTrack(track);
-      } else {
-        // Audio-only stream — play via audio element as fallback
-        const audio = document.getElementById('studio-talkback') || createTalkbackElement();
-        const stream = e.streams[0] || new MediaStream([track]);
-        audio.srcObject = stream;
-        audio.play().catch(() => {});
+        vid.muted = false;
+        vid.volume = audioEl.volume;
       }
       chatLog('', '🔊 Studio audio active', true);
     }
@@ -842,9 +863,14 @@ function createTalkbackElement() {
 }
 
 function showVideoReturn(stream) {
-  console.log('[Portal] showVideoReturn called, tracks:', stream?.getTracks().length);
-  chatLog('', '[Debug] showVideoReturn: ' + stream?.getTracks().length + ' tracks', true);
+  console.log('[Portal] showVideoReturn tracks:', stream?.getTracks().length);
   VIEWS.activateStudio(stream);
+  // Ensure studio video plays with audio unmuted
+  const vid = $('studio-return-video');
+  if (vid) {
+    vid.muted = false;
+    vid.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
+  }
 }
 
 function setHighQualityOpus(sdp) {
@@ -1022,22 +1048,35 @@ function applyViewMode(){
 }
 
 function toggleMic(){
-  S.micMuted=!S.micMuted;
-  S.localStream.getAudioTracks().forEach(t=>t.enabled=!S.micMuted);
-  $('mute-btn').textContent = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
+  if (!S.localStream) return;
+  S.micMuted = !S.micMuted;
+  S.localStream.getAudioTracks().forEach(t => t.enabled = !S.micMuted);
+  // Also update mic gain node if active
+  if (micGainNode) micGainNode.gain.value = S.micMuted ? 0 : parseFloat($('mic-gain-slider')?.value || 1);
+  const micText = S.micMuted ? 'Mic off' : 'Mic';
+  const micIcon = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
+  $('mute-btn').textContent = micIcon;
   $('mute-btn').classList.toggle('active-mute', S.micMuted);
   $('mic-dot').className = 'pill-dot ' + (S.micMuted ? 'red' : 'green');
-  $('mic-label').textContent = S.micMuted ? 'Mic off' : 'Mic live';
+  $('mic-label').textContent = micText;
   syncOverlayControls();
 }
 
 function toggleCam(){
-  S.camOff=!S.camOff;
-  S.localStream.getVideoTracks().forEach(t=>t.enabled=!S.camOff);
-  $('cam-btn').textContent = S.camOff ? '🚫 Cam off' : '📷 Cam on';
+  if (!S.localStream) return;
+  S.camOff = !S.camOff;
+  S.localStream.getVideoTracks().forEach(t => t.enabled = !S.camOff);
+  const camIcon = S.camOff ? '🚫 Cam off' : '📷 Cam on';
+  $('cam-btn').textContent = camIcon;
   $('cam-btn').classList.toggle('active-cam', S.camOff);
   $('cam-dot').className = 'pill-dot ' + (S.camOff ? 'red' : 'green');
   $('cam-label').textContent = S.camOff ? 'Cam off' : 'Cam live';
+  // Black out video when cam is off
+  const vids = ['local-video', 'dual-phone-video'];
+  vids.forEach(id => {
+    const v = $(id);
+    if (v) v.style.filter = S.camOff ? 'brightness(0)' : '';
+  });
   syncOverlayControls();
 }
 
@@ -1562,10 +1601,13 @@ function toggleStudioVideo(btn) {
 }
 
 function setStudioVolume(val) {
+  const v = parseFloat(val);
   const vid = $('studio-return-video');
-  if (vid) vid.volume = parseFloat(val);
+  if (vid) vid.volume = v;
+  const audio = document.getElementById('studio-audio-return');
+  if (audio) audio.volume = v;
   const el = $('studio-vol-val');
-  if (el) el.textContent = Math.round(val * 100) + '%';
+  if (el) el.textContent = Math.round(v * 100) + '%';
 }
 
 function startStudioLevelMeter(stream) {

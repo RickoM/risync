@@ -1701,16 +1701,21 @@ const REC = {
   },
 
   connectMicToReturnAudio() {
-    if (!this.audioStream) return null;
+    // Use audio interface stream if available, else use webcam mic
+    const micStream = this.audioStream
+      || (this.videoStream?.getAudioTracks().length ? this.videoStream : null);
+    if (!micStream) return null;
+
     const returnStream = this.ensureReturnAudio();
     if (this._returnMicConnected) return returnStream;
     try {
-      const src = this.returnAudioCtx.createMediaStreamSource(this.audioStream);
+      const src = this.returnAudioCtx.createMediaStreamSource(micStream);
       const gain = this.returnAudioCtx.createGain();
       gain.gain.value = 0.85;
       src.connect(gain);
       gain.connect(this.returnAudioDest);
       this._returnMicConnected = true;
+      console.log('[ReturnAudio] Mic connected from:', this.audioStream ? 'audio interface' : 'webcam mic');
     } catch(e) {
       console.warn('[ReturnAudio] Mic route failed:', e.message);
     }
@@ -1953,6 +1958,9 @@ const REC = {
       this.startWebcamLevelAnimation();
       this.setupWebcamAudio();
       this.populateWebcamSelect();
+      // Re-route mic to return audio for any connected phones
+      this._returnMicConnected = false;
+      this.updateReturnAudioSenders();
     } catch(e) {
       toast('Camera error: ' + e.message);
     }
