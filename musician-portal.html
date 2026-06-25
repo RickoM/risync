@@ -1198,31 +1198,46 @@ async function switchCamera(){
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const currentFacing = S.facingMode || S.localStream?.getVideoTracks()[0]?.getSettings?.().facingMode || 'user';
   const nextFacing = currentFacing === 'user' ? 'environment' : 'user';
+  const nextCamera = await pickNextCamera().catch(() => null);
   const audioTracks = S.localStream?.getAudioTracks() || [];
   const oldVideoTracks = S.localStream?.getVideoTracks() || [];
   const wantedZoom = S.digitalZoom || parseFloat($('zoom-slider')?.value || '1') || 1;
+  const studioReturnVideo = $('studio-return-video');
+  const studioReturnStream = studioReturnVideo?.srcObject || VIEWS.studioStream;
 
   try {
+    if (studioReturnVideo) {
+      studioReturnVideo.pause();
+      studioReturnVideo.srcObject = null;
+    }
     stopDigitalZoom();
     oldVideoTracks.forEach(track => {
       try { S.localStream.removeTrack(track); } catch(e) {}
       track.stop();
     });
     $('local-video').srcObject = null;
-    await sleep(1000);
+    if ($('dual-phone-video')) $('dual-phone-video').srcObject = null;
+    await sleep(700);
 
     let newStream;
     try {
       newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { exact: nextFacing },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30, max: 30 },
-        },
+        video: nextCamera
+          ? {
+              deviceId: { exact: nextCamera.deviceId },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+            }
+          : {
+              facingMode: { exact: nextFacing },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30, max: 30 },
+            },
         audio: false,
       });
-    } catch(exactError) {
+    } catch(deviceError) {
       newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: nextFacing },
@@ -1254,6 +1269,10 @@ async function switchCamera(){
     if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
     await $('dual-phone-video')?.play?.().catch(()=>{});
+    if (studioReturnVideo && studioReturnStream) {
+      studioReturnVideo.srcObject = studioReturnStream;
+      await studioReturnVideo.play().catch(()=>{});
+    }
     updateCameraControls();
     await requestAutoFocus();
     if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
@@ -1261,7 +1280,7 @@ async function switchCamera(){
     const settings = newTrack.getSettings?.() || {};
     S.facingMode = settings.facingMode || nextFacing;
     await loadCameras();
-    chatLog('', `Camera switched to ${S.facingMode}`, true);
+    chatLog('', `Camera switched${nextCamera?.label ? ': ' + nextCamera.label : ' to ' + S.facingMode}`, true);
   } catch(e) {
     try {
       const restoreFacing = currentFacing || 'user';
@@ -1273,6 +1292,10 @@ async function switchCamera(){
         if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
         await $('local-video').play().catch(()=>{});
         await $('dual-phone-video')?.play?.().catch(()=>{});
+        if (studioReturnVideo && studioReturnStream) {
+          studioReturnVideo.srcObject = studioReturnStream;
+          await studioReturnVideo.play().catch(()=>{});
+        }
         updateCameraControls();
         await requestAutoFocus();
         if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
@@ -1282,7 +1305,12 @@ async function switchCamera(){
         }));
       }
     } catch(restoreError) {}
+    if (studioReturnVideo && studioReturnStream) {
+      studioReturnVideo.srcObject = studioReturnStream;
+      studioReturnVideo.play().catch(()=>{});
+    }
     chatLog('', 'Camera switch failed: ' + e.message, true);
+    setTimeout(() => hardReloadForCamera(nextFacing), 900);
   }
 }
 
