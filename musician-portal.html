@@ -309,6 +309,21 @@ input:focus,select:focus{border-color:var(--amber)}
     <div class="meter-track"><div class="meter-fill" id="mic-meter"></div></div>
     <div class="meter-db" id="mic-db">— dB</div>
   </div>
+  <div class="meter-row" style="margin-bottom:6px">
+    <div class="meter-label" style="font-size:.6rem">GAIN</div>
+    <input type="range" id="mic-gain-slider" min="0.1" max="4" step="0.05" value="1"
+      style="flex:1;accent-color:var(--amber);height:4px"
+      oninput="setMicGain(this.value)">
+    <div class="meter-db" id="mic-gain-db">0 dB</div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button onclick="autoGainMic()" style="flex:1;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--subtle);font-family:var(--fm);font-size:.65rem;cursor:pointer" id="auto-gain-btn">
+      ⚡ Auto-gain
+    </button>
+    <button onclick="resetMicGain()" style="padding:8px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--subtle);font-family:var(--fm);font-size:.65rem;cursor:pointer">
+      Reset
+    </button>
+  </div>
   <div class="live-participants">
     <div class="lp-title">In this session</div>
     <div id="live-participants-list">
@@ -345,7 +360,7 @@ const S = {
   localStream: null, facingMode: 'user',
   peers: new Map(),
   micMuted: false, camOff: false,
-  audioCtx: null, analyser: null, vuFrame: null,
+  audioCtx: null, gainNode: null, analyser: null, vuFrame: null,
   name: '', role: '', label: '',
   zoomMode: 'none', digitalZoom: 1, zoomCanvas: null, zoomCtx: null,
   zoomFrame: null, zoomTrack: null, enhanceVideo: false,
@@ -566,21 +581,94 @@ function removeParticipantItem(peerId){ $('lp-'+peerId)?.remove(); }
 // VU METER
 function setupVU(){
   S.audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if (S.audioCtx.state === 'suspended') S.audioCtx.resume();
   const src = S.audioCtx.createMediaStreamSource(S.localStream);
+  // Gain node — between source and analyser so meter shows gained level
+  S.gainNode = S.audioCtx.createGain();
+  S.gainNode.gain.value = 1.0;
   S.analyser = S.audioCtx.createAnalyser();
-  S.analyser.fftSize=256;
-  src.connect(S.analyser);
-  const data=new Uint8Array(128);
+  S.analyser.fftSize = 256;
+  src.connect(S.gainNode);
+  S.gainNode.connect(S.analyser);
+
+  // Also route gained signal back into the stream for WebRTC
+  const dest = S.audioCtx.createMediaStreamDestination();
+  S.gainNode.connect(dest);
+  // Replace audio track in localStream with gained version
+  const gainedTrack = dest.stream.getAudioTracks()[0];
+  S.localStream.getAudioTracks().forEach(t => S.localStream.removeTrack(t));
+  S.localStream.addTrack(gainedTrack);
+  // Replace in peer connections
+  S.peers.forEach(pc => {
+    const sender = pc.getSenders().find(s => s.track?.kind === 'audio');
+    if (sender) sender.replaceTrack(gainedTrack);
+  });
+
+  const data = new Uint8Array(128);
   function draw(){
-    S.vuFrame=requestAnimationFrame(draw);
+    S.vuFrame = requestAnimationFrame(draw);
     S.analyser.getByteFrequencyData(data);
-    const avg=data.reduce((a,b)=>a+b,0)/data.length;
-    const pct=Math.min(100,avg/128*200);
-    const db=pct>0?Math.round(20*Math.log10(pct/100)):'-∞';
-    $('mic-meter').style.width=pct+'%';
-    $('mic-db').textContent=db+'dB';
+    const avg = data.reduce((a,b)=>a+b,0)/data.length;
+    const pct = Math.min(100, avg/128*200);
+    const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '-∞';
+    $('mic-meter').style.width = pct+'%';
+    $('mic-db').textContent = db+'dB';
+    // Colour meter by level
+    const fill = $('mic-meter');
+    if (pct > 90) fill.style.background = 'var(--red)';
+    else if (pct > 70) fill.style.background = 'linear-gradient(90deg,var(--teal),var(--amber))';
+    else fill.style.background = 'linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%)';
   }
   draw();
+}
+
+function setMicGain(val) {
+  const v = parseFloat(val);
+  if (S.gainNode) S.gainNode.gain.value = v;
+  const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
+  $('mic-gain-db').textContent = (db > 0 ? '+' : '') + db + ' dB';
+}
+
+function resetMicGain() {
+  $('mic-gain-slider').value = 1;
+  setMicGain(1);
+}
+
+async function autoGainMic() {
+  if (!S.analyser) return;
+  const btn = $('auto-gain-btn');
+  btn.textContent = '⟳ Analysing...';
+  btn.style.color = 'var(--amber)';
+
+  // Sample RMS over 3 seconds
+  const TARGET_DBFS = -18;
+  const samples = [];
+  const start = Date.now();
+  await new Promise(resolve => {
+    const collect = () => {
+      if (Date.now() - start > 3000) { resolve(); return; }
+      const data = new Uint8Array(S.analyser.frequencyBinCount);
+      S.analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      if (avg > 0) samples.push(avg);
+      requestAnimationFrame(collect);
+    };
+    collect();
+  });
+
+  if (!samples.length) { btn.textContent = '⚡ Auto-gain'; btn.style.color = ''; return; }
+
+  const avgLevel = samples.reduce((a,b)=>a+b,0)/samples.length;
+  const currentDB = 20 * Math.log10(avgLevel/128);
+  const diff = TARGET_DBFS - currentDB;
+  const newGain = Math.min(4, Math.max(0.1, Math.pow(10, diff/20)));
+
+  $('mic-gain-slider').value = newGain;
+  setMicGain(newGain);
+
+  btn.textContent = '⚡ Auto-gain';
+  btn.style.color = 'var(--green)';
+  setTimeout(() => btn.style.color = '', 2000);
 }
 
 // CONTROLS
