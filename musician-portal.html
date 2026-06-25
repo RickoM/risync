@@ -786,8 +786,8 @@ function syncOverlayControls(){
 function updateViewModeButton(){
   const btn = $('view-mode-btn');
   if (!btn) return;
-  btn.textContent = S.viewMode === 'multi' ? '⊟ Dual view' : '⊞ Dual view';
-  btn.title = S.viewMode === 'multi' ? 'Switch to single camera' : 'Switch to dual view (studio return)';
+  btn.textContent = S.viewMode === 'multi' ? 'View: Multi' : 'View: Single';
+  btn.title = S.viewMode === 'multi' ? 'Tap for single view' : 'Tap for multi view';
   btn.classList.toggle('active', S.viewMode === 'multi');
 }
 
@@ -1207,17 +1207,14 @@ async function switchCamera(){
   const studioReturnStream = studioReturnVideo?.srcObject || VIEWS.studioStream;
 
   try {
-    // Do NOT touch studioReturnVideo — preserve studio return during camera switch
+    // Keep studioReturnVideo playing — restore happens after switch completes
     stopDigitalZoom();
     oldVideoTracks.forEach(track => {
       try { S.localStream.removeTrack(track); } catch(e) {}
       track.stop();
     });
-    // Save studio return stream FIRST before touching anything
-    const savedStudioStream = VIEWS.studioStream;
-    // Only clear phone camera views — never touch studio-return-video
     $('local-video').srcObject = null;
-    // Don't clear dual-phone-video yet — restore happens after new stream is ready
+    if ($('dual-phone-video')) $('dual-phone-video').srcObject = null;
     await sleep(700);
 
     let newStream;
@@ -1270,8 +1267,8 @@ async function switchCamera(){
     if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
     await $('dual-phone-video')?.play?.().catch(()=>{});
-    if (studioReturnVideo && savedStudioStream) {
-      studioReturnVideo.srcObject = savedStudioStream;
+    if (studioReturnVideo && studioReturnStream) {
+      studioReturnVideo.srcObject = studioReturnStream;
       await studioReturnVideo.play().catch(()=>{});
     }
     updateCameraControls();
@@ -1333,9 +1330,13 @@ const VIEWS = {
   // Called when studio video return arrives — show dual panel
   activateStudio(stream) {
     this.studioStream = stream;
-    S.viewMode = 'multi'; // auto-switch to dual view when return arrives
     applyViewMode();
-    chatLog('', '📺 Studio return active — dual view', true);
+
+    requestAnimationFrame(() => {
+      const activeView = S.viewMode === 'multi' ? $('dual-view') : $('single-view');
+      const rect = activeView?.getBoundingClientRect?.() || { width: 0, height: 0 };
+      chatLog('', 'Studio return active - ' + S.viewMode + ' view (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')', true);
+    });
   },
 
   deactivateStudio() {
