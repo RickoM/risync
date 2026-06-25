@@ -591,6 +591,7 @@ const S = {
 
 // UTILS
 const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
 function showError(msg){ const e=$('join-error'); e.textContent=msg; e.classList.add('show'); }
 function clearError(){ $('join-error').classList.remove('show'); }
@@ -1386,7 +1387,6 @@ async function pickNextCamera() {
 }
 
 async function switchCamera(){
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const currentFacing = S.facingMode || S.localStream?.getVideoTracks()[0]?.getSettings?.().facingMode || 'user';
   const nextFacing = currentFacing === 'user' ? 'environment' : 'user';
   const nextCamera = await pickNextCamera().catch(() => null);
