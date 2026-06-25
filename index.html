@@ -1963,6 +1963,24 @@ const REC = {
         // Show phone controller strip
         const ctrlStrip = $('phone-ctrl-' + peerId);
         if (ctrlStrip) ctrlStrip.style.display = 'block';
+        // Auto-send studio webcam return to phone
+        setTimeout(() => {
+          if (REC.videoStream) {
+            REC.sendVideoReturn(peerId, true, 'webcam');
+            // Mark video return button as active
+            const vBtn = $('vidreturn-btn-' + peerId.substring(0,6));
+            if (vBtn) {
+              vBtn.dataset.active   = 'true';
+              vBtn.style.background  = 'rgba(128,96,224,.2)';
+              vBtn.style.borderColor = 'var(--violet)';
+              vBtn.style.color       = 'var(--violet)';
+              vBtn.textContent       = '📺 Video ON';
+              const sourcePanel = $('vidreturn-source-' + peerId.substring(0,6));
+              if (sourcePanel) sourcePanel.style.display = 'block';
+            }
+            REC.populateReturnCameras(peerId);
+          }
+        }, 1500); // wait for connection to stabilise
         // Poll RTT every 3s to update quality display in controller
         const rttPoll = setInterval(async () => {
           if (pc.connectionState === 'closed') { clearInterval(rttPoll); return; }
