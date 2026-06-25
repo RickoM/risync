@@ -2014,7 +2014,8 @@ const REC = {
 
     pc.ontrack = e => {
       console.log('[RISYNC] Got track from phone:', e.track.kind, 'streams:', e.streams.length);
-      if (e.streams && e.streams[0]) {
+      if (e.track.kind !== 'video') return;
+      if (e.streams && e.streams[0] && e.streams[0].getVideoTracks().length) {
         this.attachPhoneVideo(peerId, e.streams[0]);
       } else if (e.track.kind === 'video') {
         // No stream object — create one from the track directly

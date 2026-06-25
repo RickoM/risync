@@ -297,7 +297,7 @@ input:focus,select:focus{border-color:var(--amber)}
     <div class="pill"><div class="pill-dot" id="mic-dot"></div><span id="mic-label">Mic</span></div>
   </div>
   <div class="view-mode-row">
-    <button class="view-mode-btn active" id="view-mode-btn" type="button">Multi view</button>
+    <button class="view-mode-btn active" id="view-mode-btn" type="button">View: Multi</button>
   </div>
   <!-- Video stage: phone cam always shown, studio return shown alongside when active -->
   <div id="video-stage" style="width:100%;margin-bottom:12px">
@@ -786,7 +786,8 @@ function syncOverlayControls(){
 function updateViewModeButton(){
   const btn = $('view-mode-btn');
   if (!btn) return;
-  btn.textContent = S.viewMode === 'multi' ? 'Multi view' : 'Single view';
+  btn.textContent = S.viewMode === 'multi' ? 'View: Multi' : 'View: Single';
+  btn.title = S.viewMode === 'multi' ? 'Tap for single view' : 'Tap for multi view';
   btn.classList.toggle('active', S.viewMode === 'multi');
 }
 
