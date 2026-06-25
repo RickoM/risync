@@ -81,8 +81,13 @@ input:focus,select:focus{border-color:var(--amber)}
   overflow:hidden;position:relative;margin-bottom:14px;
 }
 .video-box video{width:100%;height:100%;object-fit:cover;}
-#dual-view { display:none; flex-direction:column; gap:8px; }
+#dual-view { display:none; flex-direction:column; gap:10px; width:100%; }
 #dual-view.active { display:flex; }
+.dual-video-panel{
+  position:relative;width:100%;min-height:180px;aspect-ratio:16/9;
+  border-radius:10px;overflow:hidden;background:#000;
+}
+.dual-video-panel video{width:100%;height:100%;object-fit:cover;display:block;}
 .focus-ring{
   position:absolute;width:54px;height:54px;border:2px solid var(--amber);
   border-radius:50%;pointer-events:none;transform:translate(-50%,-50%) scale(.75);
@@ -290,8 +295,8 @@ input:focus,select:focus{border-color:var(--amber)}
     <div id="dual-view" style="display:none;gap:8px">
 
       <!-- Phone cam panel — full width -->
-      <div style="position:relative;border-radius:10px;overflow:hidden;border:2px solid var(--teal);background:#000;aspect-ratio:16/9">
-        <video id="dual-phone-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
+      <div class="dual-video-panel" style="border:2px solid var(--teal)">
+        <video id="dual-phone-video" autoplay muted playsinline></video>
         <div style="position:absolute;bottom:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--teal);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
           📷 Your camera
         </div>
@@ -300,8 +305,8 @@ input:focus,select:focus{border-color:var(--amber)}
       </div>
 
       <!-- Studio return panel — full width below -->
-      <div style="position:relative;border-radius:10px;overflow:hidden;border:2px solid var(--amber);background:#000;aspect-ratio:16/9">
-        <video id="studio-return-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover"></video>
+      <div class="dual-video-panel" style="border:2px solid var(--amber)">
+        <video id="studio-return-video" autoplay playsinline></video>
         <div style="position:absolute;bottom:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--amber);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
           📺 <span id="studio-return-label">Studio</span>
         </div>
@@ -555,6 +560,9 @@ async function handleMessage(msg){
     case 'muted-by-host':
       if(msg.muted && !S.micMuted) toggleMic();
       chatLog('', 'You were muted by the host', true);
+      break;
+    case 'return-label':
+      if ($('studio-return-label')) $('studio-return-label').textContent = msg.label || 'Studio';
       break;
     case 'error':
       chatLog('', 'Error: ' + msg.message, true);
@@ -1168,17 +1176,27 @@ const VIEWS = {
   activateStudio(stream) {
     this.studioStream = stream;
 
-    // Switch to dual view — use style directly (inline style overrides classList)
-    $('single-view').style.display = 'none';
+    const singleView = $('single-view');
     const dualView = $('dual-view');
-    dualView.style.display        = 'flex';
-    dualView.style.flexDirection  = 'column';
-    dualView.style.gap            = '8px';
+    if (!dualView) {
+      chatLog('', 'Studio return active, but video layout is missing', true);
+      return;
+    }
+
+    // Switch to dual view. Use inline style because the HTML starts with display:none.
+    if (singleView) singleView.style.display = 'none';
+    dualView.classList.add('active');
+    dualView.style.setProperty('display', 'flex', 'important');
+    dualView.style.flexDirection = 'column';
+    dualView.style.gap = '10px';
+    dualView.style.width = '100%';
 
     // Phone cam in top panel
     const dualPhone = $('dual-phone-video');
     if (dualPhone) {
       dualPhone.srcObject = S.localStream;
+      dualPhone.muted = true;
+      dualPhone.playsInline = true;
       dualPhone.play().catch(() => {});
     }
 
@@ -1186,16 +1204,24 @@ const VIEWS = {
     const studioVid = $('studio-return-video');
     if (studioVid) {
       studioVid.srcObject = stream;
+      studioVid.playsInline = true;
       studioVid.play().catch(() => {});
     }
 
-    chatLog('', '📺 Studio return — ' + (stream?.getTracks().length||0) + ' tracks', true);
+    requestAnimationFrame(() => {
+      const rect = dualView.getBoundingClientRect();
+      chatLog('', 'Studio view active - two screens showing (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')', true);
+    });
   },
 
   deactivateStudio() {
     this.studioStream = null;
-    $('dual-view').style.display = 'none';
-    $('single-view').style.display = 'block';
+    const dualView = $('dual-view');
+    if (dualView) {
+      dualView.classList.remove('active');
+      dualView.style.display = 'none';
+    }
+    if ($('single-view')) $('single-view').style.display = 'block';
     const vid = $('local-video');
     if (vid) { vid.srcObject = S.localStream; vid.play().catch(() => {}); }
     chatLog('', 'Studio return closed', true);

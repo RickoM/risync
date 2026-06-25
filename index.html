@@ -2179,7 +2179,10 @@ const REC = {
   },
 
   async handlePhoneOffer(fromPeerId, sdp) {
-    const pc = await this.createPhonePeerConn(fromPeerId, false);
+    let pc = this.phonePeers?.get(fromPeerId);
+    if (!pc || pc.connectionState === 'closed' || pc.connectionState === 'failed') {
+      pc = await this.createPhonePeerConn(fromPeerId, false);
+    }
     await pc.setRemoteDescription({ type:'offer', sdp });
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
