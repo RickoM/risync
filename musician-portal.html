@@ -81,6 +81,13 @@ input:focus,select:focus{border-color:var(--amber)}
   overflow:hidden;position:relative;margin-bottom:14px;
 }
 .video-box video{width:100%;height:100%;object-fit:cover;}
+.focus-ring{
+  position:absolute;width:54px;height:54px;border:2px solid var(--amber);
+  border-radius:50%;pointer-events:none;transform:translate(-50%,-50%) scale(.75);
+  opacity:0;transition:opacity .15s,transform .2s;z-index:4;
+  box-shadow:0 0 0 4px rgba(240,160,48,.16);
+}
+.focus-ring.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 .cam-label{
   position:absolute;bottom:10px;left:10px;
   font-family:var(--fm);font-size:.65rem;letter-spacing:.08em;
@@ -257,6 +264,7 @@ input:focus,select:focus{border-color:var(--amber)}
   </div>
   <div class="video-box">
     <video id="local-video" autoplay muted playsinline></video>
+    <div class="focus-ring" id="focus-ring"></div>
     <div class="cam-label" id="cam-label-overlay">Your camera</div>
     <button class="cam-tools-toggle" id="cam-tools-toggle">Zoom</button>
     <button class="flip-btn" id="flip-btn">⟳ Flip</button>
@@ -266,6 +274,13 @@ input:focus,select:focus{border-color:var(--amber)}
       <div class="tool-label">Zoom</div>
       <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" disabled>
       <div class="tool-value" id="zoom-value">--</div>
+    </div>
+    <div class="tool-row">
+      <div class="tool-label">Clear</div>
+      <select class="tool-select" id="enhance-mode">
+        <option value="off">Off</option>
+        <option value="on">On</option>
+      </select>
     </div>
     <div class="tool-row">
       <div class="tool-label">Focus</div>
@@ -325,7 +340,7 @@ const S = {
   audioCtx: null, analyser: null, vuFrame: null,
   name: '', role: '', label: '',
   zoomMode: 'none', digitalZoom: 1, zoomCanvas: null, zoomCtx: null,
-  zoomFrame: null, zoomTrack: null,
+  zoomFrame: null, zoomTrack: null, enhanceVideo: false,
 };
 
 // UTILS
@@ -370,7 +385,12 @@ $('allow-btn').addEventListener('click', async () => {
     if (camPref === 'front') S.facingMode = 'user';
     const videoConstraint = camId
       ? { deviceId: { exact: camId } }
-      : { facingMode: { ideal: S.facingMode } };
+      : {
+          facingMode: { ideal: S.facingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        };
 
     try {
       S.localStream = await navigator.mediaDevices.getUserMedia({
@@ -563,9 +583,14 @@ $('cam-tools-toggle').addEventListener('click', () => {
   $('camera-tools').classList.toggle('open');
 });
 $('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
+$('enhance-mode').addEventListener('change', e => setEnhanceMode(e.target.value === 'on'));
 $('focus-mode').addEventListener('change', e => setFocusMode(e.target.value));
 $('focus-distance').addEventListener('input', e => setFocusDistance(parseFloat(e.target.value)));
 document.querySelector('#screen-live .meter-row')?.after($('camera-tools'));
+$('local-video').parentElement.addEventListener('click', e => {
+  if (e.target.closest('button')) return;
+  tapToFocus(e);
+});
 
 function toggleMic(){
   S.micMuted=!S.micMuted;
@@ -682,6 +707,40 @@ async function requestAutoFocus() {
   return ok;
 }
 
+async function tapToFocus(e) {
+  const box = e.currentTarget.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (e.clientX - box.left) / box.width));
+  const y = Math.max(0, Math.min(1, (e.clientY - box.top) / box.height));
+  const ring = $('focus-ring');
+  ring.style.left = (x * 100) + '%';
+  ring.style.top = (y * 100) + '%';
+  ring.classList.add('show');
+  setTimeout(() => ring.classList.remove('show'), 650);
+
+  const track = activeVideoTrack();
+  const caps = track?.getCapabilities?.() || {};
+  const modes = caps.focusMode || [];
+  const attempts = [];
+
+  if ('pointsOfInterest' in caps) {
+    attempts.push({ pointsOfInterest: [{ x, y }], focusMode: modes.includes('single-shot') ? 'single-shot' : modes.includes('continuous') ? 'continuous' : undefined });
+  }
+  if (modes.includes('single-shot')) attempts.push({ focusMode: 'single-shot' });
+  if (modes.includes('continuous')) attempts.push({ focusMode: 'continuous' });
+  if (modes.includes('auto')) attempts.push({ focusMode: 'auto' });
+
+  for (const values of attempts) {
+    Object.keys(values).forEach(k => values[k] === undefined && delete values[k]);
+    if (await applyCameraAdvanced(values)) {
+      chatLog('', 'Focus requested', true);
+      updateCameraControls();
+      return;
+    }
+  }
+
+  chatLog('', 'Tap focus not supported by this browser/camera', true);
+}
+
 function stopDigitalZoom() {
   if (S.zoomFrame) cancelAnimationFrame(S.zoomFrame);
   S.zoomFrame = null;
@@ -702,7 +761,7 @@ async function setDigitalZoom(value) {
   video.style.transformOrigin = 'center center';
   video.style.transform = S.digitalZoom > 1 ? `scale(${S.digitalZoom})` : '';
 
-  if (S.digitalZoom <= 1.01) {
+  if (S.digitalZoom <= 1.01 && !S.enhanceVideo) {
     stopDigitalZoom();
     await replaceOutboundVideoTrack(rawTrack);
     return;
@@ -725,7 +784,9 @@ async function setDigitalZoom(value) {
     const zh = h / S.digitalZoom;
     const sx = (w - zw) / 2;
     const sy = (h - zh) / 2;
+    S.zoomCtx.filter = S.enhanceVideo ? 'contrast(1.08) saturate(1.05)' : 'none';
     S.zoomCtx.drawImage(video, sx, sy, zw, zh, 0, 0, w, h);
+    S.zoomCtx.filter = 'none';
     S.zoomFrame = requestAnimationFrame(draw);
   };
   if (!S.zoomFrame) draw();
@@ -739,6 +800,12 @@ async function setCameraZoom(value) {
     await setDigitalZoom(value);
     $('zoom-value').textContent = value.toFixed(1) + 'x';
   }
+}
+
+async function setEnhanceMode(enabled) {
+  S.enhanceVideo = enabled;
+  await setDigitalZoom(S.digitalZoom || parseFloat($('zoom-slider')?.value || '1') || 1);
+  chatLog('', enabled ? 'Enhance on' : 'Enhance off', true);
 }
 
 async function setFocusMode(mode) {
@@ -904,12 +971,22 @@ async function switchCamera(){
     let newStream;
     try {
       newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: nextFacing } },
+        video: {
+          facingMode: { exact: nextFacing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
         audio: false,
       });
     } catch(exactError) {
       newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: nextFacing } },
+        video: {
+          facingMode: { ideal: nextFacing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
         audio: false,
       });
     }
@@ -934,7 +1011,7 @@ async function switchCamera(){
     await $('local-video').play().catch(()=>{});
     updateCameraControls();
     await requestAutoFocus();
-    if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
+    if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
 
     const settings = newTrack.getSettings?.() || {};
     S.facingMode = settings.facingMode || nextFacing;
@@ -951,7 +1028,7 @@ async function switchCamera(){
         await $('local-video').play().catch(()=>{});
         updateCameraControls();
         await requestAutoFocus();
-        if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
+        if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
         await Promise.all([...S.peers.values()].map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           return sender ? sender.replaceTrack(outboundVideoTrack() || restoreTrack) : Promise.resolve();
