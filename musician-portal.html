@@ -415,7 +415,7 @@ const S = {
   ws: null, peerId: null, roomId: null,
   localStream: null, facingMode: 'user',
   peers: new Map(),
-  micMuted: false, camOff: false, viewMode: 'multi',
+  micMuted: false, camOff: false, viewMode: 'single',
   audioCtx: null, analyser: null, vuFrame: null,
   name: '', role: '', label: '',
   zoomMode: 'none', digitalZoom: 1, zoomCanvas: null, zoomCtx: null,
@@ -786,8 +786,8 @@ function syncOverlayControls(){
 function updateViewModeButton(){
   const btn = $('view-mode-btn');
   if (!btn) return;
-  btn.textContent = S.viewMode === 'multi' ? 'View: Multi' : 'View: Single';
-  btn.title = S.viewMode === 'multi' ? 'Tap for single view' : 'Tap for multi view';
+  btn.textContent = S.viewMode === 'multi' ? '⊟ Dual view' : '⊞ Dual view';
+  btn.title = S.viewMode === 'multi' ? 'Switch to single camera' : 'Switch to dual view (studio return)';
   btn.classList.toggle('active', S.viewMode === 'multi');
 }
 
@@ -1207,10 +1207,7 @@ async function switchCamera(){
   const studioReturnStream = studioReturnVideo?.srcObject || VIEWS.studioStream;
 
   try {
-    if (studioReturnVideo) {
-      studioReturnVideo.pause();
-      studioReturnVideo.srcObject = null;
-    }
+    // Do NOT touch studioReturnVideo — preserve studio return during camera switch
     stopDigitalZoom();
     oldVideoTracks.forEach(track => {
       try { S.localStream.removeTrack(track); } catch(e) {}
@@ -1218,6 +1215,8 @@ async function switchCamera(){
     });
     $('local-video').srcObject = null;
     if ($('dual-phone-video')) $('dual-phone-video').srcObject = null;
+    // Save studio return stream before we disturb anything
+    const savedStudioStream = VIEWS.studioStream;
     await sleep(700);
 
     let newStream;
@@ -1270,8 +1269,8 @@ async function switchCamera(){
     if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
     await $('dual-phone-video')?.play?.().catch(()=>{});
-    if (studioReturnVideo && studioReturnStream) {
-      studioReturnVideo.srcObject = studioReturnStream;
+    if (studioReturnVideo && savedStudioStream) {
+      studioReturnVideo.srcObject = savedStudioStream;
       await studioReturnVideo.play().catch(()=>{});
     }
     updateCameraControls();
