@@ -1213,10 +1213,11 @@ async function switchCamera(){
       try { S.localStream.removeTrack(track); } catch(e) {}
       track.stop();
     });
-    $('local-video').srcObject = null;
-    if ($('dual-phone-video')) $('dual-phone-video').srcObject = null;
-    // Save studio return stream before we disturb anything
+    // Save studio return stream FIRST before touching anything
     const savedStudioStream = VIEWS.studioStream;
+    // Only clear phone camera views — never touch studio-return-video
+    $('local-video').srcObject = null;
+    // Don't clear dual-phone-video yet — restore happens after new stream is ready
     await sleep(700);
 
     let newStream;
@@ -1274,6 +1275,9 @@ async function switchCamera(){
       await studioReturnVideo.play().catch(()=>{});
     }
     updateCameraControls();
+    // Wait for camera to stabilise before requesting autofocus
+    // getCapabilities() returns empty immediately on Android
+    await sleep(500);
     await requestAutoFocus();
     if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
 
