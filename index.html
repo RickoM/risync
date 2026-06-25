@@ -395,6 +395,39 @@ label.field-label{
 <div class="tab-panel active" id="tab-record">
 <style>
 /* ── RECORD TAB STYLES ── */
+
+/* Source controller — below each camera tile */
+.src-controller {
+  background:var(--surface);border:1px solid var(--border);border-top:none;
+  border-radius:0 0 10px 10px;margin-bottom:10px;overflow:hidden;
+}
+.src-ctrl-row {
+  display:flex;align-items:center;gap:8px;padding:6px 10px;
+  border-bottom:1px solid var(--border);
+}
+.src-ctrl-row:last-child { border-bottom:none; }
+.src-ctrl-label {
+  font-family:var(--fm);font-size:.58rem;color:var(--subtle);
+  width:28px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em;
+}
+.src-ctrl-btn {
+  padding:4px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--body);font-family:var(--fm);
+  font-size:.62rem;cursor:pointer;flex-shrink:0;transition:all .15s;
+}
+.src-ctrl-btn:hover { border-color:var(--muted);color:var(--bright); }
+.src-ctrl-btn.off { border-color:var(--red);color:var(--red);background:rgba(224,72,88,.1); }
+.src-ctrl-stats {
+  display:flex;flex-direction:column;gap:3px;padding:6px 10px;
+  background:rgba(8,11,18,.4);border-left:1px solid var(--border);
+  min-width:90px;
+}
+.src-ctrl-stat {
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--fm);font-size:.55rem;
+}
+.src-ctrl-stat-label { color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
+.src-ctrl-stat-val { color:var(--bright);font-weight:700;font-size:.62rem; }
 .rec-layout{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
 @media(max-width:900px){.rec-layout{grid-template-columns:1fr}}
 
@@ -702,18 +735,78 @@ label.field-label{
     <!-- Camera Grid -->
     <span class="slabel">Cameras</span>
     <div class="cam-grid" id="cam-grid">
-      <!-- Webcam tile -->
-      <div class="cam-tile active-cam" id="cam-tile-webcam" onclick="REC.setActiveCamera('webcam',this)">
-        <video id="webcam-video" autoplay muted playsinline></video>
-        <div class="cam-tile-overlay" id="webcam-overlay">
-          <div style="font-size:1.8rem">📷</div>
-          <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Starting camera...</div>
+      <!-- Webcam tile + controller -->
+      <div>
+        <div class="cam-tile active-cam" id="cam-tile-webcam" onclick="REC.setActiveCamera('webcam',this)"
+          style="border-radius:10px 10px 0 0;margin-bottom:0">
+          <video id="webcam-video" autoplay muted playsinline></video>
+          <div class="cam-tile-overlay" id="webcam-overlay">
+            <div style="font-size:1.8rem">📷</div>
+            <div style="font-family:var(--fm);font-size:.65rem;color:var(--subtle)">Starting camera...</div>
+          </div>
+          <div class="cam-tile-badge">ACTIVE</div>
+          <div class="cam-tile-label" id="webcam-label">Webcam</div>
+          <div class="cam-tile-status live" id="webcam-status"></div>
+          <div class="cam-tile-controls">
+            <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.renameCamera('webcam')" title="Rename">✏</button>
+          </div>
         </div>
-        <div class="cam-tile-badge">ACTIVE</div>
-        <div class="cam-tile-label" id="webcam-label">Webcam</div>
-        <div class="cam-tile-status live" id="webcam-status"></div>
-        <div class="cam-tile-controls">
-          <button class="cam-ctrl-btn" onclick="event.stopPropagation();REC.renameCamera('webcam')" title="Rename">✏</button>
+        <div class="src-controller">
+          <!-- CAM row: on/off + video level indicator -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">CAM</span>
+            <button class="src-ctrl-btn" id="webcam-cam-btn" onclick="REC.toggleWebcam(this)">On</button>
+            <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 8px">
+              <div id="webcam-level" style="height:100%;width:60%;background:var(--teal);transition:width .1s"></div>
+            </div>
+          </div>
+          <!-- MIC row: on/off + level meter + dB -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">MIC</span>
+            <button class="src-ctrl-btn" id="webcam-mic-btn" onclick="REC.toggleWebcamMic(this)">On</button>
+            <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 8px">
+              <div id="webcam-mic-level" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .05s"></div>
+            </div>
+            <span id="webcam-mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:34px;text-align:right;flex-shrink:0">—dB</span>
+          </div>
+          <!-- GAIN row: mic gain slider + auto -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">GAIN</span>
+            <input type="range" id="webcam-gain-slider" min="0" max="4" step="0.05" value="1"
+              style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
+              oninput="REC.setWebcamGain(this.value)">
+            <span id="webcam-gain-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:34px;text-align:right;flex-shrink:0">0 dB</span>
+            <button class="src-ctrl-btn" onclick="REC.autoGainWebcam()" style="margin-left:4px">Auto</button>
+          </div>
+          <!-- VOL row: monitor volume for webcam preview -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">VOL</span>
+            <input type="range" min="0" max="1" step="0.05" value="0"
+              style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
+              oninput="const v=$('webcam-video'); if(v) v.volume=this.value; this.nextElementSibling.textContent=Math.round(this.value*100)+'%'">
+            <span style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right;flex-shrink:0">0%</span>
+          </div>
+          <!-- MIRROR row: horizontal flip for selfie-style webcam -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">MIRROR</span>
+            <button class="src-ctrl-btn" id="webcam-mirror-btn" onclick="REC.toggleWebcamMirror(this)">Off</button>
+            <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);flex:1;margin-left:8px">Flip image horizontally</span>
+          </div>
+          <!-- SRC row: camera source selector -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">SRC</span>
+            <select id="webcam-select-inline" onchange="REC.startWebcam(this.value)"
+              style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
+              <option value="">Default camera</option>
+            </select>
+          </div>
+          <!-- NAME row: editable label -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">NAME</span>
+            <input id="webcam-name-input" value="Webcam"
+              style="flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--body);font-family:var(--fm);font-size:.65rem;outline:none;padding:2px 4px"
+              onchange="REC.renameWebcam(this.value)">
+          </div>
         </div>
       </div>
       <!-- Add phone tile -->
@@ -1832,16 +1925,34 @@ const REC = {
   async startWebcam(deviceId) {
     try {
       if (this.videoStream) this.videoStream.getTracks().forEach(t => t.stop());
-      this.videoStream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } }
-          : { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } },
-        audio: false
-      });
+      // Capture video + laptop mic together
+      try {
+        this.videoStream = await navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? { deviceId: { exact: deviceId }, width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } }
+            : { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl:  false,
+          },
+        });
+      } catch(e) {
+        // Fallback: video only if mic denied
+        this.videoStream = await navigator.mediaDevices.getUserMedia({
+          video: deviceId
+            ? { deviceId: { exact: deviceId }, width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } }
+            : { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } },
+          audio: false,
+        });
+      }
       const v = $('webcam-video');
       v.srcObject = this.videoStream;
       $('webcam-overlay').style.display = 'none';
       $('webcam-status').className = 'cam-tile-status live';
+      this.startWebcamLevelAnimation();
+      this.setupWebcamAudio();
+      this.populateWebcamSelect();
     } catch(e) {
       toast('Camera error: ' + e.message);
     }
@@ -2405,81 +2516,73 @@ const REC = {
     // Add phone controller strip below the tile
     const ctrl = document.createElement('div');
     ctrl.id = `phone-ctrl-${peerId}`;
-    ctrl.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;display:none';
+    ctrl.className = 'src-controller';
+    ctrl.style.cssText = 'display:none;border-top:none';
     ctrl.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">📱 ${name || 'Phone'} controller</span>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-family:var(--fm);font-size:.65rem" id="q-latency-${peerId.substring(0,6)}">— ms</span>
-          <span style="font-family:var(--fm);font-size:.65rem;color:var(--teal)" id="q-current-${peerId.substring(0,6)}">Studio</span>
+      <!-- CAM row: on/off + video indicator -->
+      <div class="src-ctrl-row">
+        <span class="src-ctrl-label">CAM</span>
+        <button class="src-ctrl-btn" id="phone-cam-btn-${peerId.substring(0,6)}"
+          onclick="REC.togglePhoneCam('${peerId}', this)">On</button>
+        <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 8px">
+          <div id="phone-vid-level-${peerId.substring(0,6)}" style="height:100%;width:60%;background:var(--teal);transition:width .1s"></div>
         </div>
       </div>
-
-      <!-- Quality presets -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
-        <button class="quality-btn" data-preset="studio" data-peer="${peerId}"
-          onclick="REC.setAudioQuality('studio', this, '${peerId}')"
-          style="padding:7px 4px;background:var(--teal-glow);border:1px solid var(--teal);border-radius:7px;color:var(--teal);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
-          🎙 Studio<br><span style="color:var(--subtle);font-size:.55rem">510kbps</span>
-        </button>
-        <button class="quality-btn" data-preset="high" data-peer="${peerId}"
-          onclick="REC.setAudioQuality('high', this, '${peerId}')"
-          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
-          🔊 High<br><span style="color:var(--subtle);font-size:.55rem">128kbps</span>
-        </button>
-        <button class="quality-btn" data-preset="medium" data-peer="${peerId}"
-          onclick="REC.setAudioQuality('medium', this, '${peerId}')"
-          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
-          📶 Medium<br><span style="color:var(--subtle);font-size:.55rem">64kbps</span>
-        </button>
-        <button class="quality-btn" data-preset="voice" data-peer="${peerId}"
-          onclick="REC.setAudioQuality('voice', this, '${peerId}')"
-          style="padding:7px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--body);font-family:var(--fm);font-size:.6rem;cursor:pointer;text-align:center">
-          📞 Voice<br><span style="color:var(--subtle);font-size:.55rem">32kbps</span>
-        </button>
+      <!-- MIC row: on/off + audio level meter + dB -->
+      <div class="src-ctrl-row">
+        <span class="src-ctrl-label">MIC</span>
+        <button class="src-ctrl-btn" id="phone-mic-btn-${peerId.substring(0,6)}"
+          onclick="REC.togglePhoneMic('${peerId}', this)">On</button>
+        <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 8px">
+          <div id="phone-audio-level-${peerId.substring(0,6)}" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .05s"></div>
+        </div>
+        <span id="phone-audio-db-${peerId.substring(0,6)}" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:34px;text-align:right;flex-shrink:0">—dB</span>
       </div>
-
-      <!-- Stats + auto button -->
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="font-family:var(--fm);font-size:.62rem;color:var(--subtle)">
-          Recommended: <span id="q-rec-${peerId.substring(0,6)}" style="color:var(--amber)">—</span>
+      <!-- VOL row: volume slider -->
+      <div class="src-ctrl-row">
+        <span class="src-ctrl-label">VOL</span>
+        <input type="range" min="0" max="1" step="0.05" value="0.8"
+          style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
+          oninput="REC.setPhoneVolume('${peerId}', this.value); this.nextElementSibling.textContent=Math.round(this.value*100)+'%'">
+        <span style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right;flex-shrink:0">80%</span>
+      </div>
+      <!-- NET row: quality presets + auto -->
+      <div class="src-ctrl-row">
+        <span class="src-ctrl-label">NET</span>
+        <div style="display:flex;gap:3px;flex:1">
+          <button class="quality-btn src-ctrl-btn" data-preset="studio" data-peer="${peerId}"
+            onclick="REC.setAudioQuality('studio',this,'${peerId}')"
+            style="flex:1;border-color:var(--teal);color:var(--teal);background:var(--teal-glow)">Studio</button>
+          <button class="quality-btn src-ctrl-btn" data-preset="high" data-peer="${peerId}"
+            onclick="REC.setAudioQuality('high',this,'${peerId}')" style="flex:1">High</button>
+          <button class="quality-btn src-ctrl-btn" data-preset="medium" data-peer="${peerId}"
+            onclick="REC.setAudioQuality('medium',this,'${peerId}')" style="flex:1">Med</button>
+          <button class="quality-btn src-ctrl-btn" data-preset="voice" data-peer="${peerId}"
+            onclick="REC.setAudioQuality('voice',this,'${peerId}')" style="flex:1">Voice</button>
+        </div>
+        <button onclick="REC.autoSelectQuality('${peerId}')" class="src-ctrl-btn" style="margin-left:4px">Auto</button>
+      </div>
+      <!-- INFO row: latency + signal + talkback + return -->
+      <div class="src-ctrl-row">
+        <span class="src-ctrl-label">INFO</span>
+        <span style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);flex:1">
+          <span id="q-latency-${peerId.substring(0,6)}">—ms</span>
+          &nbsp;·&nbsp;
+          <span id="q-rec-${peerId.substring(0,6)}">—</span>
         </span>
-        <button onclick="REC.autoSelectQuality('${peerId}')"
-          style="margin-left:auto;font-family:var(--fm);font-size:.62rem;padding:4px 10px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--subtle);cursor:pointer">
-          ⚡ Auto
-        </button>
+        <button id="talkback-btn-${peerId.substring(0,6)}"
+          onclick="REC.toggleTalkback('${peerId}', this)"
+          class="src-ctrl-btn" data-active="true"
+          style="border-color:var(--amber);color:var(--amber);background:rgba(240,160,48,.1)">🎙 Talk</button>
+        <button id="vidreturn-btn-${peerId.substring(0,6)}"
+          onclick="REC.toggleVideoReturn('${peerId}', this)"
+          class="src-ctrl-btn" style="margin-left:4px">📺 Return</button>
       </div>
-
-      <!-- Talkback controls -->
-      <div style="border-top:1px solid var(--border);padding-top:10px">
-        <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px">Return to phone</div>
-        <div style="display:flex;gap:8px">
-          <button id="talkback-btn-${peerId.substring(0,6)}"
-            data-active="true"
-            onclick="REC.toggleTalkback('${peerId}', this)"
-            style="flex:1;padding:9px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:8px;color:var(--amber);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-            Return audio <span style="font-size:.6rem;color:var(--subtle)">ON</span>
-          </button>
-          <button id="vidreturn-btn-${peerId.substring(0,6)}"
-            onclick="REC.toggleVideoReturn('${peerId}', this)"
-            style="flex:1;padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer">
-            📺 Video return
-          </button>
-        </div>
-        <!-- Camera source selector for video return -->
-        <div id="vidreturn-source-${peerId.substring(0,6)}" style="display:none;margin-top:8px">
-          <div style="font-family:var(--fm);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--subtle);margin-bottom:5px">Return camera source</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="vidreturn-cams-${peerId.substring(0,6)}">
-            <button onclick="REC.setReturnCamera('${peerId}', 'webcam', this)"
-              style="padding:5px 10px;background:var(--violet-glow);border:1px solid var(--violet);border-radius:6px;color:var(--violet);font-family:var(--fm);font-size:.62rem;cursor:pointer">
-              📷 Webcam
-            </button>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;display:none"><!-- spacer close --></div
-        </div>
-        <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted);margin-top:6px;line-height:1.6">
-          Return audio sends studio mic and studio playback to phone. Video return sends studio webcam — uses extra bandwidth.
+      <!-- SRC row: return camera source (hidden until return active) -->
+      <div id="vidreturn-source-${peerId.substring(0,6)}" style="display:none" class="src-ctrl-row">
+        <span class="src-ctrl-label">SRC</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1" id="vidreturn-cams-${peerId.substring(0,6)}">
+          <button onclick="REC.setReturnCamera('${peerId}','webcam',this)" class="src-ctrl-btn">📷 Webcam</button>
         </div>
       </div>
     `;
@@ -2828,6 +2931,192 @@ const REC = {
   },
 
   // ── Phone audio controls ─────────────────────────────────────
+  // ── Webcam controller ────────────────────────────────────────
+  toggleWebcam(btn) {
+    const vid = $('webcam-video');
+    if (!vid) return;
+    const off = btn.dataset.off === 'true';
+    const next = !off;
+    btn.dataset.off = next;
+    if (vid.srcObject) {
+      vid.srcObject.getVideoTracks().forEach(t => t.enabled = !next);
+    }
+    btn.textContent = next ? 'Off' : 'On';
+    btn.classList.toggle('off', next);
+    toast(next ? 'Webcam paused' : 'Webcam on');
+  },
+
+  renameWebcam(name) {
+    const lbl = $('webcam-label');
+    if (lbl) lbl.textContent = name || 'Webcam';
+    const inp = $('webcam-name-input');
+    if (inp) inp.value = name || 'Webcam';
+  },
+
+  toggleWebcamMic(btn) {
+    if (!this.videoStream) return;
+    const off = btn.dataset.off === 'true';
+    const next = !off;
+    btn.dataset.off = next;
+    this.videoStream.getAudioTracks().forEach(t => t.enabled = !next);
+    if (this.webcamGainNode) this.webcamGainNode.gain.value = next ? 0 : parseFloat($('webcam-gain-slider')?.value || 1);
+    btn.textContent = next ? 'Off' : 'On';
+    btn.classList.toggle('off', next);
+  },
+
+  setWebcamGain(val) {
+    const v = parseFloat(val);
+    if (this.webcamGainNode) this.webcamGainNode.gain.value = v;
+    const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
+    const el = $('webcam-gain-val');
+    if (el) el.textContent = (db > 0 ? '+' : '') + db + ' dB';
+  },
+
+  async autoGainWebcam() {
+    if (!this.webcamAnalyser) return;
+    const btn = document.querySelector('[onclick="REC.autoGainWebcam()"]');
+    if (btn) btn.textContent = '⟳';
+    const TARGET = -18;
+    const samples = [];
+    const data = new Uint8Array(this.webcamAnalyser.frequencyBinCount);
+    const start = Date.now();
+    await new Promise(resolve => {
+      const collect = () => {
+        if (Date.now() - start > 3000) { resolve(); return; }
+        this.webcamAnalyser.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0)/data.length;
+        if (avg > 0) samples.push(avg);
+        requestAnimationFrame(collect);
+      };
+      collect();
+    });
+    if (!samples.length) { if (btn) btn.textContent = 'Auto'; return; }
+    const avgLevel = samples.reduce((a,b)=>a+b,0)/samples.length;
+    const currentDB = 20 * Math.log10(avgLevel / 128);
+    const diff = TARGET - currentDB;
+    const newGain = Math.min(4, Math.max(0.1, Math.pow(10, diff / 20)));
+    const slider = $('webcam-gain-slider');
+    if (slider) slider.value = newGain;
+    this.setWebcamGain(newGain);
+    if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = 'Auto', 1500); }
+    toast('Webcam mic gain set to ' + (20*Math.log10(newGain)).toFixed(1) + ' dB');
+  },
+
+  // Setup Web Audio for webcam mic — gain + level meter
+  setupWebcamAudio() {
+    const audioTracks = this.videoStream?.getAudioTracks() || [];
+    if (!audioTracks.length) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      const src = ctx.createMediaStreamSource(this.videoStream);
+      this.webcamGainNode = ctx.createGain();
+      this.webcamGainNode.gain.value = 1.0;
+      this.webcamAnalyser = ctx.createAnalyser();
+      this.webcamAnalyser.fftSize = 256;
+      src.connect(this.webcamGainNode);
+      this.webcamGainNode.connect(this.webcamAnalyser);
+
+      // Animate level meter
+      const data = new Uint8Array(this.webcamAnalyser.frequencyBinCount);
+      const draw = () => {
+        requestAnimationFrame(draw);
+        this.webcamAnalyser.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0)/data.length;
+        const pct = Math.min(100, avg/128*200);
+        const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '—';
+        const lvl = $('webcam-mic-level'); if(lvl) lvl.style.width = pct+'%';
+        const dbEl = $('webcam-mic-db');   if(dbEl) dbEl.textContent = db+'dB';
+      };
+      draw();
+    } catch(e) { console.warn('Webcam audio setup:', e.message); }
+  },
+
+  toggleWebcamMirror(btn) {
+    const vid = $('webcam-video');
+    if (!vid) return;
+    const mirrored = btn.dataset.mirrored === 'true';
+    const next = !mirrored;
+    btn.dataset.mirrored = next;
+    vid.style.transform = next ? 'scaleX(-1)' : '';
+    btn.textContent = next ? 'On' : 'Off';
+    btn.classList.toggle('off', !next);
+    btn.style.borderColor = next ? 'var(--amber)' : '';
+    btn.style.color = next ? 'var(--amber)' : '';
+  },
+
+  // Animate webcam video level indicator (simulated — video-only stream)
+  async populateWebcamSelect() {
+    const sel = $('webcam-select-inline');
+    if (!sel) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      sel.innerHTML = cams.map(c =>
+        `<option value="${c.deviceId}">${c.label || 'Camera '+c.deviceId.slice(0,6)}</option>`
+      ).join('');
+      // Also sync main webcam select
+      const mainSel = $('webcam-select');
+      if (mainSel) mainSel.innerHTML = sel.innerHTML;
+    } catch(e) {}
+  },
+
+  startWebcamLevelAnimation() {
+    const lvl = $('webcam-level');
+    if (!lvl) return;
+    // Webcam has no audio — show a steady green bar to indicate live video
+    lvl.style.width = '65%';
+    lvl.style.background = 'var(--teal)';
+  },
+
+  // ── Phone camera controller ───────────────────────────────────
+  togglePhoneCam(peerId, btn) {
+    const vid = $(`phone-vid-${peerId}`);
+    if (!vid?.srcObject) return;
+    const off = btn.dataset.off === 'true';
+    const next = !off;
+    btn.dataset.off = next;
+    vid.srcObject.getVideoTracks().forEach(t => t.enabled = !next);
+    // Also tell phone
+    this.sigSend({ type: 'host-cam', targetPeerId: peerId, enabled: !next });
+    btn.textContent = next ? 'Off' : 'On';
+    btn.classList.toggle('off', next);
+    const lvl = $('phone-vid-level-' + peerId.substring(0,6));
+    if (lvl) lvl.style.background = next ? 'var(--red)' : 'var(--teal)';
+  },
+
+  togglePhoneMic(peerId, btn) {
+    const vid = $(`phone-vid-${peerId}`);
+    if (!vid?.srcObject) return;
+    const off = btn.dataset.off === 'true';
+    const next = !off;
+    btn.dataset.off = next;
+    vid.srcObject.getAudioTracks().forEach(t => t.enabled = !next);
+    // Also mute phone nodes
+    const nodes = this.phoneAudioNodes?.get(peerId);
+    if (nodes?.gain) nodes.gain.gain.value = next ? 0 : 1;
+    btn.textContent = next ? 'Off' : 'On';
+    btn.classList.toggle('off', next);
+  },
+
+  // Start audio level animation for a phone peer
+  startPhoneAudioLevel(peerId, analyser) {
+    const shortId = peerId.substring(0,6);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const draw = () => {
+      requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const pct = Math.min(100, avg/128*200);
+      const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '—';
+      const lvl = $('phone-audio-level-'+shortId);
+      const dbEl = $('phone-audio-db-'+shortId);
+      if (lvl)  lvl.style.width  = pct+'%';
+      if (dbEl) dbEl.textContent = db+'dB';
+    };
+    draw();
+  },
+
   setPhoneVolume(peerId, vol) {
     const vid = $(`phone-vid-${peerId}`);
     if (vid) vid.volume = Math.max(0, Math.min(1, vol));
