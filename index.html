@@ -1294,6 +1294,63 @@ label.field-label{
       </div>
 
       <!-- Audio mix per participant -->
+      <!-- NETWORK AUDIO QUALITY CONTROL -->
+      <div class="card mt16" id="audio-quality-card" style="display:none">
+        <div class="card-title" style="margin-bottom:12px">Network audio quality</div>
+        <div style="font-family:var(--fm);font-size:.7rem;color:var(--subtle);margin-bottom:12px;line-height:1.7">
+          Higher quality needs more bandwidth. Drop to a lower preset if you hear dropouts or glitching.
+        </div>
+
+        <!-- Quality presets -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="quality-presets">
+          <button class="quality-btn" data-preset="studio" onclick="REC.setAudioQuality('studio', this)"
+            style="padding:10px 6px;background:var(--teal-glow);border:1px solid var(--teal);border-radius:8px;color:var(--teal);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
+            <div style="font-size:.8rem;margin-bottom:3px">🎙</div>
+            <div style="font-weight:700">Studio</div>
+            <div style="color:var(--subtle);margin-top:2px">510kbps</div>
+          </button>
+          <button class="quality-btn" data-preset="high" onclick="REC.setAudioQuality('high', this)"
+            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
+            <div style="font-size:.8rem;margin-bottom:3px">🔊</div>
+            <div style="font-weight:700">High</div>
+            <div style="color:var(--subtle);margin-top:2px">128kbps</div>
+          </button>
+          <button class="quality-btn" data-preset="medium" onclick="REC.setAudioQuality('medium', this)"
+            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
+            <div style="font-size:.8rem;margin-bottom:3px">📶</div>
+            <div style="font-weight:700">Medium</div>
+            <div style="color:var(--subtle);margin-top:2px">64kbps</div>
+          </button>
+          <button class="quality-btn" data-preset="voice" onclick="REC.setAudioQuality('voice', this)"
+            style="padding:10px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.62rem;cursor:pointer;text-align:center">
+            <div style="font-size:.8rem;margin-bottom:3px">📞</div>
+            <div style="font-weight:700">Voice</div>
+            <div style="color:var(--subtle);margin-top:2px">32kbps</div>
+          </button>
+        </div>
+
+        <!-- Current stats -->
+        <div style="display:flex;gap:16px;padding:10px 12px;background:var(--panel2);border-radius:8px;border:1px solid var(--border)">
+          <div>
+            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Latency</div>
+            <div style="font-family:var(--fm);font-size:.9rem;color:var(--bright)" id="quality-latency">— ms</div>
+          </div>
+          <div>
+            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Quality</div>
+            <div style="font-family:var(--fm);font-size:.9rem;color:var(--teal)" id="quality-current">Studio</div>
+          </div>
+          <div>
+            <div style="font-family:var(--fm);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:3px">Recommended</div>
+            <div style="font-family:var(--fm);font-size:.9rem;color:var(--amber)" id="quality-recommended">—</div>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center">
+            <button onclick="REC.autoSelectQuality()" style="font-family:var(--fm);font-size:.65rem;padding:6px 12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--subtle);cursor:pointer">
+              ⚡ Auto
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="card mt16" id="remote-mix-card" style="display:none">
         <div class="card-title" style="margin-bottom:12px">Remote audio mix</div>
         <div id="remote-audio-channels" style="display:flex;flex-direction:column;gap:10px">
@@ -1327,6 +1384,21 @@ label.field-label{
 <div id="toast"></div>
 
 <script>
+// ══════════════════════════════════════════════════════════════
+// HIGH QUALITY OPUS — 510kbps stereo vs default 32kbps mono
+// ══════════════════════════════════════════════════════════════
+function setHighQualityOpus(sdp) {
+  const m = sdp.match(/a=rtpmap:(\d+) opus\/48000\/2/);
+  if (!m) return sdp;
+  const pt = m[1];
+  sdp = sdp.replace(new RegExp('a=fmtp:' + pt + ' .*\r\n', 'g'), '');
+  sdp = sdp.replace(
+    new RegExp('(a=rtpmap:' + pt + ' opus/48000/2\r\n)'),
+    '$1a=fmtp:' + pt + ' maxaveragebitrate=510000;stereo=1;sprop-stereo=1;useinbandfec=1;usedtx=0\r\n'
+  );
+  return sdp;
+}
+
 // ══════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════
@@ -1859,6 +1931,7 @@ const REC = {
         console.log('[RISYNC] Room:', this._pendingRoomCode);
         toast(`${msg.name || 'Phone'} connected — establishing video...`);
         $('qr-modal').classList.remove('open');
+        $('audio-quality-card').style.display = 'block';
         this.addPhoneCamera(msg.peerId, msg.name || 'Phone');
         // Delay then send WebRTC offer to phone
         setTimeout(async () => {
@@ -1944,6 +2017,18 @@ const REC = {
         if (status) { status.className = 'cam-tile-status live'; }
         if (conn)   { conn.style.display = 'none'; }
         toast('Phone camera live!');
+        // Poll RTT every 3s to update quality panel
+        const rttPoll = setInterval(async () => {
+          if (pc.connectionState === 'closed') { clearInterval(rttPoll); return; }
+          try {
+            const stats = await pc.getStats();
+            stats.forEach(r => {
+              if (r.type === 'candidate-pair' && r.nominated && r.currentRoundTripTime != null) {
+                REC.updateQualityStats(Math.round(r.currentRoundTripTime * 1000));
+              }
+            });
+          } catch(e) {}
+        }, 3000);
       }
       if (pc.connectionState === 'failed') {
         if (status) status.className = 'cam-tile-status';
@@ -1953,8 +2038,9 @@ const REC = {
 
     if (initiate) {
       const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
-      await pc.setLocalDescription(offer);
-      this.sigSend({ type:'offer', sdp: offer.sdp, fromPeerId: this.studioPeerId, targetPeerId: peerId });
+      const hqOffer = new RTCSessionDescription({ type:'offer', sdp: REC.buildOpusSDP ? REC.buildOpusSDP(offer.sdp, REC.currentQuality||'studio') : setHighQualityOpus(offer.sdp) });
+      await pc.setLocalDescription(hqOffer);
+      this.sigSend({ type:'offer', sdp: hqOffer.sdp, fromPeerId: this.studioPeerId, targetPeerId: peerId });
     }
     return pc;
   },
@@ -2351,6 +2437,66 @@ const REC = {
       this.manualBPM = bpm;
       $('manual-bpm').value = bpm;
       $('loop-bpm').textContent = bpm;
+    }
+  },
+
+  // ── Audio quality control ────────────────────────────────────
+  audioQualityPresets: {
+    studio: { bitrate: 510000, stereo: true,  fec: true,  dtx: false, label: 'Studio',  color: 'var(--teal)'   },
+    high:   { bitrate: 128000, stereo: true,  fec: true,  dtx: false, label: 'High',    color: 'var(--green)'  },
+    medium: { bitrate: 64000,  stereo: false, fec: true,  dtx: false, label: 'Medium',  color: 'var(--amber)'  },
+    voice:  { bitrate: 32000,  stereo: false, fec: true,  dtx: true,  label: 'Voice',   color: 'var(--subtle)' },
+  },
+  currentQuality: 'studio',
+  _lastRTT: null,
+
+  buildOpusSDP(sdp, preset) {
+    const p = this.audioQualityPresets[preset];
+    const m = sdp.match(/a=rtpmap:(\d+) opus\/48000\/2/);
+    if (!m) return sdp;
+    const pt = m[1];
+    sdp = sdp.replace(new RegExp('a=fmtp:' + pt + ' .*\r\n', 'g'), '');
+    const params = 'maxaveragebitrate=' + p.bitrate + ';stereo=' + (p.stereo?1:0) + ';sprop-stereo=' + (p.stereo?1:0) + ';useinbandfec=' + (p.fec?1:0) + ';usedtx=' + (p.dtx?1:0);
+    return sdp.replace(new RegExp('(a=rtpmap:' + pt + ' opus/48000/2\r\n)'), '$1a=fmtp:' + pt + ' ' + params + '\r\n');
+  },
+
+  async setAudioQuality(preset, btn) {
+    this.currentQuality = preset;
+    const p = this.audioQualityPresets[preset];
+    document.querySelectorAll('.quality-btn').forEach(b => {
+      b.style.background = 'var(--panel2)'; b.style.borderColor = 'var(--border)'; b.style.color = 'var(--body)';
+    });
+    if (btn) { btn.style.background = p.color + '18'; btn.style.borderColor = p.color; btn.style.color = p.color; }
+    const qualEl = $('quality-current');
+    if (qualEl) { qualEl.textContent = p.label; qualEl.style.color = p.color; }
+    if (!this.phonePeers?.size) { toast('Quality set — applies to next connection'); return; }
+    for (const [peerId, pc] of this.phonePeers) {
+      if (pc.connectionState !== 'connected') continue;
+      try {
+        const offer = await pc.createOffer();
+        const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP(offer.sdp, preset) });
+        await pc.setLocalDescription(hqOffer);
+        this.sigSend({ type:'offer', sdp:hqOffer.sdp, fromPeerId:this.studioPeerId, targetPeerId:peerId });
+      } catch(e) { console.warn('[Quality] Renegotiation failed:', e.message); }
+    }
+    toast('Audio quality: ' + p.label + ' (' + Math.round(p.bitrate/1000) + 'kbps)');
+  },
+
+  autoSelectQuality() {
+    const rtt = this._lastRTT || 999;
+    const preset = rtt < 80 ? 'studio' : rtt < 150 ? 'high' : rtt < 300 ? 'medium' : 'voice';
+    const btn = document.querySelector('.quality-btn[data-preset="' + preset + '"]');
+    this.setAudioQuality(preset, btn);
+  },
+
+  updateQualityStats(rtt) {
+    this._lastRTT = rtt;
+    const latEl = $('quality-latency');
+    if (latEl) { latEl.textContent = rtt + ' ms'; latEl.style.color = rtt < 80 ? 'var(--green)' : rtt < 300 ? 'var(--amber)' : 'var(--red)'; }
+    const recEl = $('quality-recommended');
+    if (recEl) {
+      const rec = rtt < 80 ? ['Studio','var(--teal)'] : rtt < 150 ? ['High','var(--green)'] : rtt < 300 ? ['Medium','var(--amber)'] : ['Voice','var(--subtle)'];
+      recEl.textContent = rec[0]; recEl.style.color = rec[1];
     }
   },
 
