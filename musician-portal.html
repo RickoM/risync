@@ -96,7 +96,7 @@ input:focus,select:focus{border-color:var(--amber)}
 }
 .focus-ring.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 .cam-label{
-  position:absolute;bottom:10px;left:10px;
+  position:absolute;top:10px;left:10px;
   font-family:var(--fm);font-size:.65rem;letter-spacing:.08em;
   background:rgba(8,11,18,.75);color:var(--bright);
   padding:4px 10px;border-radius:20px;
@@ -307,7 +307,30 @@ input:focus,select:focus{border-color:var(--amber)}
       <div class="video-box">
         <video id="local-video" autoplay muted playsinline></video>
         <div class="focus-ring" id="focus-ring"></div>
-        <div class="cam-label" id="cam-label-overlay">Your camera</div>
+        <div class="cam-label" id="cam-label-overlay">Phone Cam</div>
+        <!-- Mic gain control overlay — above meter -->
+        <div style="position:absolute;bottom:60px;left:8px;right:8px;z-index:3">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
+            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">GAIN</span>
+            <input type="range" id="mic-gain-slider" min="0" max="4" step="0.05" value="1"
+              style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer;pointer-events:all"
+              oninput="setMicGain(this.value)">
+            <span id="mic-gain-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
+            <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
+              style="font-family:var(--fm);font-size:.55rem;padding:2px 6px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;pointer-events:all">⚡</button>
+          </div>
+        </div>
+
+        <!-- Mic level overlay — bottom left of video -->
+        <div id="mic-overlay" style="position:absolute;bottom:36px;left:8px;right:8px;z-index:3;pointer-events:none">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
+            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">MIC</span>
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
+              <div id="mic-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+            </div>
+            <span id="mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+          </div>
+        </div>
         <div class="cam-side-controls">
           <button class="cam-side-btn" id="cam-side-cam" type="button">Cam</button>
           <button class="cam-side-btn" id="cam-side-mic" type="button">Mic</button>
@@ -324,8 +347,30 @@ input:focus,select:focus{border-color:var(--amber)}
       <div class="dual-video-panel" style="border:2px solid var(--teal)">
         <video id="dual-phone-video" autoplay muted playsinline></video>
         <div class="focus-ring" id="focus-ring-dual"></div>
-        <div style="position:absolute;bottom:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--teal);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
-          📷 Your camera
+        <div style="position:absolute;top:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--teal);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
+          📷 Phone Cam
+        </div>
+        <!-- Mic gain overlay in dual view -->
+        <div style="position:absolute;bottom:60px;left:8px;right:8px;z-index:3">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
+            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">GAIN</span>
+            <input type="range" id="mic-gain-slider-dual" min="0" max="4" step="0.05" value="1"
+              style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer;pointer-events:all"
+              oninput="setMicGain(this.value)">
+            <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
+            <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
+              style="font-family:var(--fm);font-size:.55rem;padding:2px 6px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;pointer-events:all">⚡</button>
+          </div>
+        </div>
+        <!-- Mic level overlay in dual view -->
+        <div style="position:absolute;bottom:36px;left:8px;right:8px;z-index:3;pointer-events:none">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(8,11,18,.55);border-radius:8px;padding:4px 8px;backdrop-filter:blur(4px)">
+            <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:20px">MIC</span>
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
+              <div id="mic-meter-dual" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+            </div>
+            <span id="mic-db-dual" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+          </div>
         </div>
         <div class="cam-side-controls">
           <button class="cam-side-btn" id="cam-side-cam-dual" type="button">Cam</button>
@@ -338,8 +383,8 @@ input:focus,select:focus{border-color:var(--amber)}
       <!-- Studio return panel — full width below -->
       <div class="dual-video-panel" style="border:2px solid var(--amber)">
         <video id="studio-return-video" autoplay playsinline></video>
-        <div style="position:absolute;bottom:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--amber);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
-          📺 <span id="studio-return-label">Studio</span>
+        <div style="position:absolute;top:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--amber);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
+          📺 <span id="studio-return-label">Studio Cam</span>
         </div>
         <button onclick="VIEWS.deactivateStudio()"
           style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:1px solid var(--border);color:var(--subtle);border-radius:6px;padding:4px 8px;font-size:.65rem;cursor:pointer">
@@ -375,11 +420,7 @@ input:focus,select:focus{border-color:var(--amber)}
       <div class="tool-value" id="focus-value">--</div>
     </div>
   </div>
-  <div class="meter-row">
-    <div class="meter-label" style="font-size:.6rem">MIC</div>
-    <div class="meter-track"><div class="meter-fill" id="mic-meter"></div></div>
-    <div class="meter-db" id="mic-db">— dB</div>
-  </div>
+
   <div class="live-participants">
     <div class="lp-title">In this session</div>
     <div id="live-participants-list">
@@ -512,6 +553,7 @@ $('allow-btn').addEventListener('click', async () => {
     $('mic-label').textContent = 'Mic live';
     syncOverlayControls();
     setupVU();
+    setupMicGain();
     show('screen-live');
     connectWS();
     loadCameras().then(() => {
@@ -717,8 +759,10 @@ function setupVU(){
     const avg=data.reduce((a,b)=>a+b,0)/data.length;
     const pct=Math.min(100,avg/128*200);
     const db=pct>0?Math.round(20*Math.log10(pct/100)):'-∞';
-    $('mic-meter').style.width=pct+'%';
-    $('mic-db').textContent=db+'dB';
+    const fill = $('mic-meter'); if(fill) fill.style.width=pct+'%';
+    const dbEl = $('mic-db'); if(dbEl) dbEl.textContent=db+'dB';
+    const fillD = $('mic-meter-dual'); if(fillD) fillD.style.width=pct+'%';
+    const dbD = $('mic-db-dual'); if(dbD) dbD.textContent=db+'dB';
   }
   draw();
 }
@@ -786,7 +830,7 @@ function syncOverlayControls(){
 function updateViewModeButton(){
   const btn = $('view-mode-btn');
   if (!btn) return;
-  btn.textContent = S.viewMode === 'multi' ? 'View: Multi' : 'View: Single';
+  btn.textContent = S.viewMode === 'multi' ? 'Single view' : 'Multi view';
   btn.title = S.viewMode === 'multi' ? 'Tap for single view' : 'Tap for multi view';
   btn.classList.toggle('active', S.viewMode === 'multi');
 }
@@ -1272,6 +1316,7 @@ async function switchCamera(){
       await studioReturnVideo.play().catch(()=>{});
     }
     updateCameraControls();
+    await sleep(600); // let camera stabilise before reading capabilities
     await requestAutoFocus();
     if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
 
@@ -1345,6 +1390,74 @@ const VIEWS = {
     chatLog('', 'Studio return closed', true);
   },
 };
+
+// ── MIC GAIN ──────────────────────────────────────────────────
+let micGainNode = null;
+
+function setupMicGain() {
+  if (!S.localStream || !S.localStream.getAudioTracks().length) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    const src  = ctx.createMediaStreamSource(S.localStream);
+    micGainNode = ctx.createGain();
+    micGainNode.gain.value = 1.0;
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(micGainNode);
+    micGainNode.connect(dest);
+    micGainNode.connect(ctx.destination); // for VU meter
+
+    // Replace audio track in stream with gained version
+    const gainedTrack = dest.stream.getAudioTracks()[0];
+    S.localStream.getAudioTracks().forEach(t => S.localStream.removeTrack(t));
+    S.localStream.addTrack(gainedTrack);
+
+    // Replace in peer connections
+    S.peers.forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track?.kind === 'audio');
+      if (sender) sender.replaceTrack(gainedTrack);
+    });
+  } catch(e) { console.warn('Mic gain setup:', e.message); }
+}
+
+function setMicGain(val) {
+  const v = parseFloat(val);
+  if (micGainNode) micGainNode.gain.value = v;
+  const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
+  const label = (db > 0 ? '+' : '') + db + ' dB';
+  // Update both single and dual view sliders and labels
+  const s1 = $('mic-gain-slider');     if (s1) s1.value = v;
+  const s2 = $('mic-gain-slider-dual'); if (s2) s2.value = v;
+  const l1 = $('mic-gain-val');        if (l1) l1.textContent = label;
+  const l2 = $('mic-gain-val-dual');   if (l2) l2.textContent = label;
+}
+
+async function autoGainMic() {
+  if (!S.analyser) return;
+  const btn = document.querySelector('[onclick="autoGainMic()"]');
+  if (btn) { btn.textContent = '⟳'; }
+  const TARGET_DBFS = -18;
+  const samples = [];
+  const data = new Uint8Array(S.analyser.frequencyBinCount);
+  const start = Date.now();
+  await new Promise(resolve => {
+    const collect = () => {
+      if (Date.now() - start > 3000) { resolve(); return; }
+      S.analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      if (avg > 0) samples.push(avg);
+      requestAnimationFrame(collect);
+    };
+    collect();
+  });
+  if (!samples.length) { if (btn) btn.textContent = '⚡'; return; }
+  const avgLevel = samples.reduce((a,b)=>a+b,0)/samples.length;
+  const currentDB = 20 * Math.log10(avgLevel/128);
+  const diff = TARGET_DBFS - currentDB;
+  const newGain = Math.min(4, Math.max(0.1, Math.pow(10, diff/20)));
+  setMicGain(newGain);
+  if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '⚡', 1500); }
+}
 
 // LEAVE
 $('leave-btn').addEventListener('click', ()=>{
