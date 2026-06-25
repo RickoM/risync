@@ -124,6 +124,14 @@ input:focus,select:focus{border-color:var(--amber)}
   flex:1;background:var(--panel);border:1px solid var(--border);
   border-radius:8px;color:var(--bright);font-size:.78rem;padding:8px 10px;
 }
+.focus-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;flex:1}
+.focus-btn{
+  background:var(--panel);border:1px solid var(--border);
+  color:var(--body);border-radius:8px;padding:8px 6px;
+  font-family:var(--fd);font-weight:700;font-size:.72rem;cursor:pointer;
+}
+.focus-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(240,160,48,.12)}
+.focus-btn:disabled{opacity:.35;cursor:not-allowed}
 .meter-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .meter-label{font-family:var(--fm);font-size:.65rem;color:var(--subtle);width:36px}
 .meter-track{flex:1;height:8px;background:var(--panel);border-radius:4px;overflow:hidden}
@@ -284,11 +292,11 @@ input:focus,select:focus{border-color:var(--amber)}
     </div>
     <div class="tool-row">
       <div class="tool-label">Focus</div>
-      <select class="tool-select" id="focus-mode" disabled>
-        <option value="continuous">Auto</option>
-        <option value="single-shot">Single</option>
-        <option value="manual">Manual</option>
-      </select>
+      <div class="focus-buttons" id="focus-buttons">
+        <button class="focus-btn" data-focus-mode="continuous" type="button">Auto</button>
+        <button class="focus-btn" data-focus-mode="single-shot" type="button">Single</button>
+        <button class="focus-btn" data-focus-mode="manual" type="button">Manual</button>
+      </div>
     </div>
     <div class="tool-row" id="focus-distance-row" style="display:none">
       <div class="tool-label">Dist</div>
@@ -584,7 +592,10 @@ $('cam-tools-toggle').addEventListener('click', () => {
 });
 $('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
 $('enhance-mode').addEventListener('change', e => setEnhanceMode(e.target.value === 'on'));
-$('focus-mode').addEventListener('change', e => setFocusMode(e.target.value));
+$('focus-buttons').addEventListener('click', e => {
+  const btn = e.target.closest('.focus-btn');
+  if (btn && !btn.disabled) setFocusMode(btn.dataset.focusMode);
+});
 $('focus-distance').addEventListener('input', e => setFocusDistance(parseFloat(e.target.value)));
 document.querySelector('#screen-live .meter-row')?.after($('camera-tools'));
 $('local-video').parentElement.addEventListener('click', e => {
@@ -631,7 +642,7 @@ function updateCameraControls() {
   const settings = track?.getSettings?.() || {};
   const zoom = $('zoom-slider');
   const zoomValue = $('zoom-value');
-  const focusMode = $('focus-mode');
+  const focusButtons = [...document.querySelectorAll('.focus-btn')];
   const focusDistance = $('focus-distance');
   const focusRow = $('focus-distance-row');
   const focusValue = $('focus-value');
@@ -653,17 +664,16 @@ function updateCameraControls() {
   }
 
   const modes = caps.focusMode || [];
-  focusMode.disabled = !modes.length;
-  [...focusMode.options].forEach(opt => {
-    opt.disabled = modes.length && !modes.includes(opt.value);
+  const currentMode = settings.focusMode || (modes.includes('continuous') ? 'continuous' : modes[0] || '');
+  focusButtons.forEach(btn => {
+    const supported = modes.includes(btn.dataset.focusMode);
+    btn.disabled = !supported;
+    btn.classList.toggle('active', supported && btn.dataset.focusMode === currentMode);
   });
-  if (modes.length) {
-    focusMode.value = settings.focusMode || (modes.includes('continuous') ? 'continuous' : modes[0]);
-  }
 
   if (caps.focusDistance) {
     focusRow.style.display = '';
-    focusDistance.disabled = focusMode.value !== 'manual';
+    focusDistance.disabled = currentMode !== 'manual';
     focusDistance.min = caps.focusDistance.min ?? 0;
     focusDistance.max = caps.focusDistance.max ?? 1;
     focusDistance.step = caps.focusDistance.step ?? 0.01;
@@ -701,7 +711,7 @@ async function requestAutoFocus() {
   if (!mode) return false;
   const ok = await applyCameraAdvanced({ focusMode: mode });
   if (ok) {
-    $('focus-mode').value = mode;
+    updateCameraControls();
     chatLog('', 'Autofocus enabled', true);
   }
   return ok;
