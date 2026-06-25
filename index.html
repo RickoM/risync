@@ -1395,6 +1395,43 @@ label.field-label{
         </div>
       </div>
 
+      <!-- Return audio mix — what phone musicians hear -->
+      <div class="card mt16" id="return-mix-card" style="display:none">
+        <div class="card-title" style="margin-bottom:4px">Return mix to phone</div>
+        <div style="font-family:var(--fm);font-size:.68rem;color:var(--subtle);margin-bottom:12px;line-height:1.6">
+          Select what the remote musician hears. Combine mic, interface, or loopback audio.
+        </div>
+
+        <!-- Return sources -->
+        <div id="return-sources" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+          <!-- populated dynamically -->
+        </div>
+
+        <!-- Add source button -->
+        <button onclick="REC.addReturnSource()" class="btn btn-secondary"
+          style="width:100%;font-size:.7rem;padding:8px">
+          + Add audio source
+        </button>
+
+        <!-- Master return level -->
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px">MASTER</span>
+            <input type="range" id="return-master-vol" min="0" max="1" step="0.05" value="0.85"
+              style="flex:1;height:3px;accent-color:var(--amber)"
+              oninput="REC.setReturnMasterVol(this.value)">
+            <span id="return-master-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:30px;text-align:right">85%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px">LVL</span>
+            <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden">
+              <div id="return-master-meter" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--amber) 70%,var(--red) 92%);transition:width .05s"></div>
+            </div>
+            <span id="return-master-db" style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:30px;text-align:right">—dB</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Recording mode -->
       <div class="card mt16">
         <div class="card-title" style="margin-bottom:12px">Recording mode</div>
@@ -1698,6 +1735,157 @@ const REC = {
     }
     if (this.returnAudioCtx.state === 'suspended') this.returnAudioCtx.resume().catch(() => {});
     return this.returnAudioDest.stream;
+  },
+
+  // ── Return mix management ────────────────────────────────────
+  returnSources: new Map(), // sourceId → { stream, gainNode, label }
+
+  async addReturnSource() {
+    // Enumerate all audio inputs
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs  = devices.filter(d => d.kind === 'audioinput');
+    if (!inputs.length) { toast('No audio inputs found'); return; }
+
+    // Build picker
+    const existing = [...this.returnSources.keys()];
+    const available = inputs.filter(d => !existing.includes(d.deviceId));
+    if (!available.length) { toast('All inputs already added'); return; }
+
+    // Show simple select dialog using toast
+    const labels = available.map((d,i) => (i+1) + '. ' + (d.label || 'Input ' + i)).join('\n');
+    const pick = prompt('Select audio source to add to return mix:\n\n' + labels + '\n\nEnter number:');
+    if (!pick) return;
+    const idx = parseInt(pick) - 1;
+    if (idx < 0 || idx >= available.length) return;
+    const device = available[idx];
+    await this.connectReturnSource(device.deviceId, device.label || 'Input ' + (idx+1));
+  },
+
+  async connectReturnSource(deviceId, label) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl:  false,
+        },
+        video: false,
+      });
+
+      const returnStream = this.ensureReturnAudio();
+      const src   = this.returnAudioCtx.createMediaStreamSource(stream);
+      const gain  = this.returnAudioCtx.createGain();
+      gain.gain.value = 0.85;
+      src.connect(gain);
+      gain.connect(this.returnAudioDest);
+
+      // Analyser for level meter
+      const analyser = this.returnAudioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      gain.connect(analyser);
+
+      this.returnSources.set(deviceId, { stream, gainNode: gain, analyser, label });
+      this.renderReturnSources();
+      this.startReturnMasterMeter();
+      this.updateReturnAudioSenders();
+      toast('Added to return mix: ' + label);
+    } catch(e) {
+      toast('Could not access ' + label + ': ' + e.message);
+    }
+  },
+
+  removeReturnSource(deviceId) {
+    const src = this.returnSources.get(deviceId);
+    if (!src) return;
+    src.stream.getTracks().forEach(t => t.stop());
+    src.gainNode.disconnect();
+    this.returnSources.delete(deviceId);
+    this.renderReturnSources();
+    toast('Source removed from return mix');
+  },
+
+  setReturnSourceGain(deviceId, val) {
+    const src = this.returnSources.get(deviceId);
+    if (src) src.gainNode.gain.value = parseFloat(val);
+  },
+
+  setReturnMasterVol(val) {
+    // Master gain via all source gains
+    const v = parseFloat(val);
+    $('return-master-val').textContent = Math.round(v * 100) + '%';
+  },
+
+  renderReturnSources() {
+    const container = $('return-sources');
+    if (!container) return;
+    if (!this.returnSources.size) {
+      container.innerHTML = '<div style="font-family:var(--fm);font-size:.68rem;color:var(--subtle)">No sources added yet</div>';
+      return;
+    }
+    container.innerHTML = [...this.returnSources.entries()].map(([id, src]) => `
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--fm);font-size:.68rem;color:var(--bright);flex:1">${src.label}</span>
+          <button onclick="REC.removeReturnSource('${id}')"
+            style="font-family:var(--fm);font-size:.6rem;padding:2px 8px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--subtle);cursor:pointer">Remove</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border)">
+          <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px">GAIN</span>
+          <input type="range" min="0" max="2" step="0.05" value="0.85"
+            style="flex:1;height:3px;accent-color:var(--amber)"
+            oninput="REC.setReturnSourceGain('${id}', this.value)">
+          <span style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right">85%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px">
+          <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px">LVL</span>
+          <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden">
+            <div id="return-lvl-${id.substring(0,8)}" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .05s"></div>
+          </div>
+          <span id="return-db-${id.substring(0,8)}" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:30px;text-align:right">—dB</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Start level animations
+    this.returnSources.forEach((src, id) => {
+      if (!src.analyser) return;
+      const data = new Uint8Array(src.analyser.frequencyBinCount);
+      const lvl  = $('return-lvl-' + id.substring(0,8));
+      const dbEl = $('return-db-'  + id.substring(0,8));
+      const draw = () => {
+        requestAnimationFrame(draw);
+        src.analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0)/data.length;
+        const pct = Math.min(100, avg/128*200);
+        const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '—';
+        if(lvl)  lvl.style.width   = pct+'%';
+        if(dbEl) dbEl.textContent  = db+'dB';
+      };
+      draw();
+    });
+  },
+
+  startReturnMasterMeter() {
+    if (this._returnMasterMeterRunning) return;
+    this._returnMasterMeterRunning = true;
+    const analyser = this.returnAudioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    this.returnAudioDest.connect?.(analyser);
+    // Tap off the destination stream instead
+    const monSrc = this.returnAudioCtx.createMediaStreamSource(this.returnAudioDest.stream);
+    monSrc.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const draw = () => {
+      requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
+      const pct = Math.min(100, avg/128*200);
+      const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '—';
+      const m = $('return-master-meter'); if(m) m.style.width = pct+'%';
+      const d = $('return-master-db');   if(d) d.textContent  = db+'dB';
+    };
+    draw();
   },
 
   connectMicToReturnAudio() {
