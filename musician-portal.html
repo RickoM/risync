@@ -355,7 +355,7 @@ input:focus,select:focus{border-color:var(--amber)}
         <!-- Row 1: Video + controls -->
         <tr>
           <td style="position:relative;width:100%">
-            <div style="position:relative;aspect-ratio:4/3;background:#000;overflow:hidden">
+            <div style="position:relative;aspect-ratio:3/2;background:#000;overflow:hidden">
               <video id="local-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>
               <div class="focus-ring" id="focus-ring"></div>
               <div class="cam-label" id="cam-label-overlay">Phone Cam</div>
@@ -379,15 +379,24 @@ input:focus,select:focus{border-color:var(--amber)}
                 style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
                 oninput="setMicGain(this.value)">
               <span id="mic-gain-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
-              <button onclick="autoGainMic()"
-                style="font-family:var(--fm);font-size:.58rem;padding:2px 8px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;flex-shrink:0">⚡</button>
+              <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
+                style="font-family:var(--fm);font-size:.55rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;flex-shrink:0;letter-spacing:.02em">Auto</button>
             </div>
           </td>
-          <td rowspan="2" style="border-left:1px solid var(--border);padding:8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:58px">
-            <div style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);display:flex;flex-direction:column;gap:5px;text-align:center">
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">LATENCY</div><div id="stat-latency" style="color:var(--bright);font-size:.65rem">— ms</div></div>
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">SIGNAL</div><div id="stat-signal" style="color:var(--bright);font-size:.65rem">—</div></div>
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">QUALITY</div><div id="stat-quality" style="color:var(--bright);font-size:.65rem">—</div></div>
+          <td rowspan="2" style="border-left:1px solid var(--border);padding:10px 8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:90px;max-width:90px">
+            <div style="font-family:var(--fm);display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Latency</span>
+                <span id="stat-latency" style="font-size:.68rem;color:var(--bright);font-weight:700">— ms</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Signal</span>
+                <span id="stat-signal" style="font-size:.68rem;color:var(--bright);font-weight:700">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Quality</span>
+                <span id="stat-quality" style="font-size:.68rem;color:var(--bright);font-weight:700">—</span>
+              </div>
             </div>
           </td>
         </tr>
@@ -433,8 +442,8 @@ input:focus,select:focus{border-color:var(--amber)}
                 style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
                 oninput="setMicGain(this.value)">
               <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0 dB</span>
-              <button onclick="autoGainMic()"
-                style="font-family:var(--fm);font-size:.58rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer">⚡</button>
+              <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
+                style="font-family:var(--fm);font-size:.55rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;letter-spacing:.02em">Auto</button>
             </div>
             <div class="cam-info-row">
               <span class="cam-info-label">MIC</span>
@@ -469,34 +478,40 @@ input:focus,select:focus{border-color:var(--amber)}
             </div>
           </td>
         </tr>
-        <!-- Row 2: Speaker level -->
+        <!-- Row 2: VOL + LVL compacted into one row -->
         <tr style="border-top:1px solid var(--border)">
-          <td style="padding:7px 10px;background:var(--surface)">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">VOL</span>
-              <input type="range" id="studio-vol-slider" min="0" max="1" step="0.05" value="0.8"
-                style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
-                oninput="setStudioVolume(this.value)">
-              <span id="studio-vol-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">80%</span>
-            </div>
-          </td>
-          <td rowspan="2" style="border-left:1px solid var(--border);padding:8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:58px">
-            <div style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);display:flex;flex-direction:column;gap:5px;text-align:center">
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">LATENCY</div><div id="stat-latency-dual" style="color:var(--bright);font-size:.65rem">— ms</div></div>
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">SIGNAL</div><div id="stat-signal-dual" style="color:var(--bright);font-size:.65rem">—</div></div>
-              <div><div style="color:var(--muted);font-size:.52rem;margin-bottom:1px">QUALITY</div><div id="stat-quality-dual" style="color:var(--bright);font-size:.65rem">—</div></div>
-            </div>
-          </td>
-        </tr>
-        <!-- Row 3: Level indicator -->
-        <tr style="border-top:1px solid var(--border)">
-          <td style="padding:7px 10px;background:var(--surface)">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">LVL</span>
-              <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden">
-                <div id="studio-level-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+          <td style="padding:6px 10px;background:var(--surface)">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:24px;flex-shrink:0">VOL</span>
+                <input type="range" id="studio-vol-slider" min="0" max="1" step="0.05" value="0.8"
+                  style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
+                  oninput="setStudioVolume(this.value)">
+                <span id="studio-vol-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right">80%</span>
               </div>
-              <span id="studio-level-db" style="font-family:var(--fm);font-size:.6rem;color:var(--subtle);width:36px;text-align:right">— dB</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:24px;flex-shrink:0">LVL</span>
+                <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden">
+                  <div id="studio-level-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
+                </div>
+                <span id="studio-level-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:30px;text-align:right">—dB</span>
+              </div>
+            </div>
+          </td>
+          <td style="border-left:1px solid var(--border);padding:10px 8px;background:rgba(8,11,18,.5);vertical-align:middle;min-width:90px;max-width:90px">
+            <div style="font-family:var(--fm);display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Latency</span>
+                <span id="stat-latency-dual" style="font-size:.68rem;color:var(--bright);font-weight:700">— ms</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Signal</span>
+                <span id="stat-signal-dual" style="font-size:.68rem;color:var(--bright);font-weight:700">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
+                <span style="font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Quality</span>
+                <span id="stat-quality-dual" style="font-size:.68rem;color:var(--bright);font-weight:700">—</span>
+              </div>
             </div>
           </td>
         </tr>
@@ -771,17 +786,24 @@ function createPeerConnection(targetPeerId, initiate){
   pc.ontrack = e => {
     const track = e.track;
     console.log('[Portal] Received track from studio:', track.kind);
-    if (track.kind === 'audio') {
-      // Studio return audio — play through phone speaker
-      const audio = document.getElementById('studio-talkback') || createTalkbackElement();
-      const stream = e.streams[0] || new MediaStream([track]);
-      audio.srcObject = stream;
-      audio.play().catch(() => {});
-      chatLog('', 'Studio return audio active', true);
-    }
+    // Both audio and video arrive — attach full stream to studio-return-video
     if (track.kind === 'video') {
-      // Studio video return — show in return preview
-      showVideoReturn(e.streams[0] || new MediaStream([track]));
+      const stream = e.streams[0] || new MediaStream([track]);
+      showVideoReturn(stream);
+    }
+    if (track.kind === 'audio') {
+      // If video already set srcObject, add audio track to it
+      const vid = $('studio-return-video');
+      if (vid && vid.srcObject) {
+        vid.srcObject.addTrack(track);
+      } else {
+        // Audio-only stream — play via audio element as fallback
+        const audio = document.getElementById('studio-talkback') || createTalkbackElement();
+        const stream = e.streams[0] || new MediaStream([track]);
+        audio.srcObject = stream;
+        audio.play().catch(() => {});
+      }
+      chatLog('', '🔊 Studio audio active', true);
     }
   };
 
@@ -1099,21 +1121,22 @@ async function applyCameraAdvanced(values) {
 }
 
 async function requestAutoFocus() {
-  const track = activeVideoTrack();
-  const caps = track?.getCapabilities?.() || {};
-  const modes = caps.focusMode || [];
-  if (!modes.length) return false;
-  const mode = modes.includes('continuous') ? 'continuous'
-    : modes.includes('single-shot') ? 'single-shot'
-    : modes.includes('auto') ? 'auto'
-    : null;
-  if (!mode) return false;
-  const ok = await applyCameraAdvanced({ focusMode: mode });
-  if (ok) {
-    updateCameraControls();
-    chatLog('', 'Autofocus enabled', true);
+  // Retry up to 3 times with delay — getCapabilities() returns empty right after switch
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(600);
+    const track = activeVideoTrack();
+    const caps  = track?.getCapabilities?.() || {};
+    const modes = caps.focusMode || [];
+    if (!modes.length) continue; // retry
+    const mode = modes.includes('continuous') ? 'continuous'
+      : modes.includes('single-shot') ? 'single-shot'
+      : modes.includes('auto') ? 'auto'
+      : null;
+    if (!mode) continue;
+    const ok = await applyCameraAdvanced({ focusMode: mode });
+    if (ok) { updateCameraControls(); return true; }
   }
-  return ok;
+  return false;
 }
 
 async function tapToFocus(e) {
