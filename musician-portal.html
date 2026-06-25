@@ -1275,9 +1275,6 @@ async function switchCamera(){
       await studioReturnVideo.play().catch(()=>{});
     }
     updateCameraControls();
-    // Wait for camera to stabilise before requesting autofocus
-    // getCapabilities() returns empty immediately on Android
-    await sleep(500);
     await requestAutoFocus();
     if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
 
@@ -1336,13 +1333,9 @@ const VIEWS = {
   // Called when studio video return arrives — show dual panel
   activateStudio(stream) {
     this.studioStream = stream;
+    S.viewMode = 'multi'; // auto-switch to dual view when return arrives
     applyViewMode();
-
-    requestAnimationFrame(() => {
-      const activeView = S.viewMode === 'multi' ? $('dual-view') : $('single-view');
-      const rect = activeView?.getBoundingClientRect?.() || { width: 0, height: 0 };
-      chatLog('', 'Studio return active - ' + S.viewMode + ' view (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')', true);
-    });
+    chatLog('', '📺 Studio return active — dual view', true);
   },
 
   deactivateStudio() {
