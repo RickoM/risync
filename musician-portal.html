@@ -1611,20 +1611,40 @@ let studioLevelCtx   = null;
 let studioLevelFrame = null;
 
 function forcePlayStudioAudio(btn) {
+  // Diagnose exactly what state the audio element is in
   const audioEl = document.getElementById('studio-audio-return');
-  if (!audioEl) {
-    chatLog('', 'No audio element yet — waiting for studio to connect', true);
+  chatLog('', 'Audio el: ' + (audioEl ? 'exists' : 'MISSING'), true);
+  if (!audioEl) return;
+  chatLog('', 'srcObject: ' + (audioEl.srcObject ? audioEl.srcObject.getTracks().length + ' tracks' : 'NULL'), true);
+  chatLog('', 'muted:' + audioEl.muted + ' vol:' + audioEl.volume + ' state:' + audioEl.readyState + ' paused:' + audioEl.paused, true);
+
+  // Try creating a brand new audio element with the same stream
+  const stream = audioEl.srcObject || VIEWS.studioStream;
+  if (!stream) {
+    chatLog('', 'No stream available at all', true);
     return;
   }
-  audioEl.muted = false;
-  audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
-  audioEl.play()
+
+  // Remove old element and create fresh one
+  audioEl.pause();
+  audioEl.srcObject = null;
+  audioEl.remove();
+
+  const newAudio = document.createElement('audio');
+  newAudio.id = 'studio-audio-return';
+  newAudio.muted = false;
+  newAudio.autoplay = true;
+  newAudio.srcObject = stream;
+  newAudio.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
+  document.body.appendChild(newAudio);
+
+  newAudio.play()
     .then(() => {
       btn.textContent = '🔊 On';
       btn.style.color = 'var(--green)';
-      chatLog('', '🔊 Studio audio playing', true);
+      chatLog('', '🔊 Playing! tracks:' + stream.getAudioTracks().length + ' enabled:' + stream.getAudioTracks()[0]?.enabled, true);
     })
-    .catch(e => chatLog('', 'Play failed: ' + e.message, true));
+    .catch(e => chatLog('', 'Play failed: ' + e.name + ': ' + e.message, true));
 }
 
 function toggleStudioAudio(btn) {
