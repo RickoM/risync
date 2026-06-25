@@ -1695,6 +1695,7 @@ const REC = {
         }
       });
       this.audioStream = stream;
+      this._returnMicConnected = false;
       this.connectMicToReturnAudio();
       this.updateReturnAudioSenders();
       const src = this.audioCtx.createMediaStreamSource(stream);
@@ -1897,11 +1898,15 @@ const REC = {
     const returnStream = this.ensureReturnAudio();
     if (this._returnMicConnected) return returnStream;
     try {
+      try { this._returnMicSource?.disconnect(); } catch(e) {}
+      try { this._returnMicGain?.disconnect(); } catch(e) {}
       const src = this.returnAudioCtx.createMediaStreamSource(micStream);
       const gain = this.returnAudioCtx.createGain();
       gain.gain.value = 0.85;
       src.connect(gain);
       gain.connect(this.returnAudioDest);
+      this._returnMicSource = src;
+      this._returnMicGain = gain;
       this._returnMicConnected = true;
       console.log('[ReturnAudio] Mic connected from:', this.audioStream ? 'audio interface' : 'webcam mic');
     } catch(e) {
@@ -1933,6 +1938,7 @@ const REC = {
     const returnStream = this.ensureReturnAudio();
     this.connectMicToReturnAudio();
     const track = returnStream.getAudioTracks()[0];
+    if (track) track.enabled = true;
     this.talkbackSenders?.forEach((senders, peerId) => {
       const pc = this.phonePeers?.get(peerId);
       if (!pc || pc.connectionState === 'closed') return;
@@ -1940,6 +1946,15 @@ const REC = {
         senders.audio.replaceTrack(track).catch(() => {});
       } else {
         senders.audio = pc.addTrack(track, returnStream);
+        if (pc.signalingState === 'stable') {
+          pc.createOffer()
+            .then(offer => {
+              const sdp = this.buildOpusSDP ? this.buildOpusSDP(offer.sdp, this.currentQuality || 'studio') : offer.sdp;
+              return pc.setLocalDescription({ type: 'offer', sdp }).then(() => sdp);
+            })
+            .then(sdp => this.sigSend({ type:'offer', sdp, fromPeerId:this.studioPeerId, targetPeerId:peerId }))
+            .catch(e => console.warn('[ReturnAudio] Renegotiation failed:', e.message));
+        }
       }
     });
   },
