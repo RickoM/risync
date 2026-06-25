@@ -614,9 +614,9 @@ function createTalkbackElement() {
 }
 
 function showVideoReturn(stream) {
-  // Use VIEWS multi-view system
+  console.log('[Portal] showVideoReturn called, tracks:', stream?.getTracks().length);
+  chatLog('', '[Debug] showVideoReturn: ' + stream?.getTracks().length + ' tracks', true);
   VIEWS.activateStudio(stream);
-  chatLog('', '📺 Studio video return — tap thumbnail to swap view', true);
 }
 
 function setHighQualityOpus(sdp) {
@@ -1168,34 +1168,36 @@ const VIEWS = {
   activateStudio(stream) {
     this.studioStream = stream;
 
-    // Switch to dual view
+    // Switch to dual view — use style directly (inline style overrides classList)
     $('single-view').style.display = 'none';
-    $('dual-view').classList.add('active');
+    const dualView = $('dual-view');
+    dualView.style.display        = 'flex';
+    dualView.style.flexDirection  = 'column';
+    dualView.style.gap            = '8px';
 
-    // Phone cam in left panel
+    // Phone cam in top panel
     const dualPhone = $('dual-phone-video');
-    dualPhone.srcObject = S.localStream;
-    dualPhone.play().catch(() => {});
+    if (dualPhone) {
+      dualPhone.srcObject = S.localStream;
+      dualPhone.play().catch(() => {});
+    }
 
-    // Studio return in right panel
+    // Studio return in bottom panel
     const studioVid = $('studio-return-video');
-    studioVid.srcObject = stream;
-    studioVid.play().catch(() => {});
+    if (studioVid) {
+      studioVid.srcObject = stream;
+      studioVid.play().catch(() => {});
+    }
 
-    chatLog('', '📺 Studio view active — two screens showing', true);
+    chatLog('', '📺 Studio return — ' + (stream?.getTracks().length||0) + ' tracks', true);
   },
 
-  // Close studio return — back to single camera view
   deactivateStudio() {
     this.studioStream = null;
-    $('dual-view').classList.remove('active');
+    $('dual-view').style.display = 'none';
     $('single-view').style.display = 'block';
-
-    // Restore local video in single view
     const vid = $('local-video');
-    vid.srcObject = S.localStream;
-    vid.play().catch(() => {});
-
+    if (vid) { vid.srcObject = S.localStream; vid.play().catch(() => {}); }
     chatLog('', 'Studio return closed', true);
   },
 };

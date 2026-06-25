@@ -1963,14 +1963,17 @@ const REC = {
         // Show phone controller strip
         const ctrlStrip = $('phone-ctrl-' + peerId);
         if (ctrlStrip) ctrlStrip.style.display = 'block';
-        // Auto-send studio webcam return to phone
-        setTimeout(() => {
+        // Auto-send studio webcam return to phone after connection stabilises
+        setTimeout(async () => {
+          // Start webcam if not already running
+          if (!REC.videoStream) {
+            try { await REC.startWebcam(); } catch(e) { console.warn('[VideoReturn] Could not start webcam:', e.message); }
+          }
           if (REC.videoStream) {
-            REC.sendVideoReturn(peerId, true, 'webcam');
-            // Mark video return button as active
+            await REC.sendVideoReturn(peerId, true, 'webcam');
             const vBtn = $('vidreturn-btn-' + peerId.substring(0,6));
             if (vBtn) {
-              vBtn.dataset.active   = 'true';
+              vBtn.dataset.active    = 'true';
               vBtn.style.background  = 'rgba(128,96,224,.2)';
               vBtn.style.borderColor = 'var(--violet)';
               vBtn.style.color       = 'var(--violet)';
@@ -1979,8 +1982,10 @@ const REC = {
               if (sourcePanel) sourcePanel.style.display = 'block';
             }
             REC.populateReturnCameras(peerId);
+          } else {
+            toast('No webcam available for video return — start webcam in Record tab');
           }
-        }, 1500); // wait for connection to stabilise
+        }, 2000);
         // Poll RTT every 3s to update quality display in controller
         const rttPoll = setInterval(async () => {
           if (pc.connectionState === 'closed') { clearInterval(rttPoll); return; }
