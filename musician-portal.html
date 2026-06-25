@@ -685,6 +685,7 @@ $('allow-btn').addEventListener('click', async () => {
     setupMicGain();
     show('screen-live');
     connectWS();
+    unlockAudioContext();
     loadCameras().then(() => {
       const track = S.localStream.getVideoTracks()[0];
       const id = track?.getSettings()?.deviceId;
@@ -707,6 +708,27 @@ if (urlParams.get('autojoin') === '1' && urlRoom) {
 }
 
 // WEBSOCKET
+// Pre-unlock audio playback on first user interaction
+function unlockAudioContext() {
+  // Create and immediately resume a silent AudioContext
+  // This pre-grants audio permission for later autoplay
+  const unlock = () => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(() => {
+      ctx.close();
+      // Also try playing a silent audio element to unlock HTMLMediaElement
+      const silent = document.createElement('audio');
+      silent.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      silent.volume = 0;
+      silent.play().catch(() => {});
+    }).catch(() => {});
+    document.removeEventListener('touchstart', unlock);
+    document.removeEventListener('click', unlock);
+  };
+  document.addEventListener('touchstart', unlock, { once: true });
+  document.addEventListener('click', unlock, { once: true });
+}
+
 function connectWS(){
   S.ws = new WebSocket(BACKEND_WS);
   S.ws.onopen = () => { $('conn-dot').className='pill-dot amber'; $('conn-label').textContent='Connecting...'; };
@@ -809,13 +831,15 @@ function createPeerConnection(targetPeerId, initiate){
         document.body.appendChild(audioEl);
       }
       audioEl.srcObject = stream;
+      audioEl.muted = false;
       audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
-      audioEl.play().catch(() => {
-        document.addEventListener('click', () => {
-          audioEl.muted = false;
-          audioEl.play().catch(() => {});
-        }, { once: true });
-        chatLog('', '🔊 Tap screen to enable studio audio', true);
+
+      audioEl.play().then(() => {
+        chatLog('', '🔊 Studio audio playing', true);
+        hideAudioUnlock();
+      }).catch(() => {
+        // Autoplay blocked — show unlock button
+        showAudioUnlock(audioEl);
       });
 
       // Also attach to video element if visible
@@ -1610,6 +1634,35 @@ function setStudioVolume(val) {
   if (audio) audio.volume = v;
   const el = $('studio-vol-val');
   if (el) el.textContent = Math.round(v * 100) + '%';
+}
+
+function showAudioUnlock(audioEl) {
+  let btn = document.getElementById('audio-unlock-btn');
+  if (btn) return; // already showing
+  btn = document.createElement('button');
+  btn.id = 'audio-unlock-btn';
+  btn.textContent = '🔊 Tap to hear studio audio';
+  btn.style.cssText = [
+    'position:fixed;bottom:80px;left:50%;transform:translateX(-50%)',
+    'z-index:999;padding:14px 24px',
+    'background:var(--amber);border:none;border-radius:12px',
+    'color:#000;font-family:var(--fd);font-weight:800;font-size:.9rem',
+    'cursor:pointer;box-shadow:0 4px 20px rgba(240,160,48,.5)',
+    'animation:tallyblink 1s infinite'
+  ].join(';');
+  btn.onclick = () => {
+    audioEl.muted = false;
+    audioEl.play().then(() => {
+      hideAudioUnlock();
+      chatLog('', '🔊 Studio audio enabled', true);
+    }).catch(e => chatLog('', 'Audio error: ' + e.message, true));
+  };
+  document.body.appendChild(btn);
+  chatLog('', '🔊 Tap the button to enable studio audio', true);
+}
+
+function hideAudioUnlock() {
+  document.getElementById('audio-unlock-btn')?.remove();
 }
 
 function startStudioLevelMeter(stream) {
