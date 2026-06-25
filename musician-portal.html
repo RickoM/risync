@@ -314,6 +314,8 @@ const S = {
   micMuted: false, camOff: false,
   audioCtx: null, analyser: null, vuFrame: null,
   name: '', role: '', label: '',
+  zoomMode: 'none', digitalZoom: 1, zoomCanvas: null, zoomCtx: null,
+  zoomFrame: null, zoomTrack: null,
 };
 
 // UTILS
@@ -476,7 +478,9 @@ async function handleMessage(msg){
 function createPeerConnection(targetPeerId, initiate){
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   S.peers.set(targetPeerId, pc);
-  S.localStream.getTracks().forEach(track => pc.addTrack(track, S.localStream));
+  S.localStream.getAudioTracks().forEach(track => pc.addTrack(track, S.localStream));
+  const videoTrack = outboundVideoTrack();
+  if (videoTrack) pc.addTrack(videoTrack, S.localStream);
   pc.onicecandidate = e => {
     if(e.candidate) send({ type:'ice-candidate', targetPeerId, candidate:e.candidate });
   };
@@ -547,6 +551,7 @@ $('flip-btn').addEventListener('click', flipCamera);
 $('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
 $('focus-mode').addEventListener('change', e => setFocusMode(e.target.value));
 $('focus-distance').addEventListener('input', e => setFocusDistance(parseFloat(e.target.value)));
+document.querySelector('#screen-live .meter-row')?.after($('camera-tools'));
 
 function toggleMic(){
   S.micMuted=!S.micMuted;
@@ -570,6 +575,17 @@ function activeVideoTrack() {
   return S.localStream?.getVideoTracks()[0] || null;
 }
 
+function outboundVideoTrack() {
+  return S.zoomTrack || activeVideoTrack();
+}
+
+async function replaceOutboundVideoTrack(track) {
+  await Promise.all([...S.peers.values()].map(pc => {
+    const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+    return sender ? sender.replaceTrack(track) : Promise.resolve();
+  }));
+}
+
 function updateCameraControls() {
   const track = activeVideoTrack();
   const caps = track?.getCapabilities?.() || {};
@@ -582,6 +598,7 @@ function updateCameraControls() {
   const focusValue = $('focus-value');
 
   if (caps.zoom) {
+    S.zoomMode = 'hardware';
     zoom.disabled = false;
     zoom.min = caps.zoom.min ?? 1;
     zoom.max = caps.zoom.max ?? 1;
@@ -589,9 +606,11 @@ function updateCameraControls() {
     zoom.value = settings.zoom ?? caps.zoom.min ?? 1;
     zoomValue.textContent = Number(zoom.value).toFixed(1) + 'x';
   } else {
-    zoom.disabled = true;
-    zoom.min = 1; zoom.max = 1; zoom.value = 1;
-    zoomValue.textContent = 'n/a';
+    S.zoomMode = 'digital';
+    zoom.disabled = false;
+    zoom.min = 1; zoom.max = 4; zoom.step = 0.1;
+    zoom.value = S.digitalZoom || 1;
+    zoomValue.textContent = Number(zoom.value).toFixed(1) + 'x';
   }
 
   const modes = caps.focusMode || [];
@@ -631,9 +650,63 @@ async function applyCameraAdvanced(values) {
   }
 }
 
+function stopDigitalZoom() {
+  if (S.zoomFrame) cancelAnimationFrame(S.zoomFrame);
+  S.zoomFrame = null;
+  if (S.zoomTrack) S.zoomTrack.stop();
+  S.zoomTrack = null;
+  S.zoomCanvas = null;
+  S.zoomCtx = null;
+  const video = $('local-video');
+  if (video) video.style.transform = '';
+}
+
+async function setDigitalZoom(value) {
+  S.digitalZoom = Math.max(1, value || 1);
+  const video = $('local-video');
+  const rawTrack = activeVideoTrack();
+  if (!video || !rawTrack) return;
+
+  video.style.transformOrigin = 'center center';
+  video.style.transform = S.digitalZoom > 1 ? `scale(${S.digitalZoom})` : '';
+
+  if (S.digitalZoom <= 1.01) {
+    stopDigitalZoom();
+    await replaceOutboundVideoTrack(rawTrack);
+    return;
+  }
+
+  if (!S.zoomCanvas) {
+    S.zoomCanvas = document.createElement('canvas');
+    S.zoomCtx = S.zoomCanvas.getContext('2d');
+    const canvasStream = S.zoomCanvas.captureStream ? S.zoomCanvas.captureStream(30) : null;
+    S.zoomTrack = canvasStream?.getVideoTracks()[0] || null;
+    if (S.zoomTrack) await replaceOutboundVideoTrack(S.zoomTrack);
+  }
+
+  const draw = () => {
+    const w = video.videoWidth || rawTrack.getSettings?.().width || 1280;
+    const h = video.videoHeight || rawTrack.getSettings?.().height || 720;
+    if (S.zoomCanvas.width !== w) S.zoomCanvas.width = w;
+    if (S.zoomCanvas.height !== h) S.zoomCanvas.height = h;
+    const zw = w / S.digitalZoom;
+    const zh = h / S.digitalZoom;
+    const sx = (w - zw) / 2;
+    const sy = (h - zh) / 2;
+    S.zoomCtx.drawImage(video, sx, sy, zw, zh, 0, 0, w, h);
+    S.zoomFrame = requestAnimationFrame(draw);
+  };
+  if (!S.zoomFrame) draw();
+}
+
 async function setCameraZoom(value) {
-  const ok = await applyCameraAdvanced({ zoom: value });
-  if (ok) $('zoom-value').textContent = value.toFixed(1) + 'x';
+  if (S.zoomMode === 'hardware') {
+    const ok = await applyCameraAdvanced({ zoom: value });
+    if (ok) $('zoom-value').textContent = value.toFixed(1) + 'x';
+  } else {
+    await setDigitalZoom(value);
+    $('zoom-value').textContent = value.toFixed(1) + 'x';
+  }
 }
 
 async function setFocusMode(mode) {
@@ -785,8 +858,10 @@ async function switchCamera(){
   const nextFacing = currentFacing === 'user' ? 'environment' : 'user';
   const audioTracks = S.localStream?.getAudioTracks() || [];
   const oldVideoTracks = S.localStream?.getVideoTracks() || [];
+  const wantedZoom = S.digitalZoom || parseFloat($('zoom-slider')?.value || '1') || 1;
 
   try {
+    stopDigitalZoom();
     oldVideoTracks.forEach(track => {
       try { S.localStream.removeTrack(track); } catch(e) {}
       track.stop();
@@ -826,6 +901,7 @@ async function switchCamera(){
     $('local-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
     updateCameraControls();
+    if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
 
     const settings = newTrack.getSettings?.() || {};
     S.facingMode = settings.facingMode || nextFacing;
@@ -841,9 +917,10 @@ async function switchCamera(){
         $('local-video').srcObject = S.localStream;
         await $('local-video').play().catch(()=>{});
         updateCameraControls();
+        if (S.zoomMode === 'digital' && wantedZoom > 1) await setDigitalZoom(wantedZoom);
         await Promise.all([...S.peers.values()].map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          return sender ? sender.replaceTrack(restoreTrack) : Promise.resolve();
+          return sender ? sender.replaceTrack(outboundVideoTrack() || restoreTrack) : Promise.resolve();
         }));
       }
     } catch(restoreError) {}
@@ -864,6 +941,7 @@ $('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat();
 
 // LEAVE
 $('leave-btn').addEventListener('click', ()=>{
+  stopDigitalZoom();
   S.localStream?.getTracks().forEach(t=>t.stop());
   S.ws?.close();
   S.peers.forEach(pc=>pc.close());
