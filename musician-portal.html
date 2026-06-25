@@ -811,7 +811,6 @@ function createPeerConnection(targetPeerId, initiate){
       audioEl.srcObject = stream;
       audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
       audioEl.play().catch(() => {
-        // Autoplay blocked — unlock on first tap
         document.addEventListener('click', () => {
           audioEl.muted = false;
           audioEl.play().catch(() => {});
@@ -825,6 +824,9 @@ function createPeerConnection(targetPeerId, initiate){
         vid.muted = false;
         vid.volume = audioEl.volume;
       }
+
+      // Start level meter for studio audio
+      startStudioLevelMeter(stream);
       chatLog('', '🔊 Studio audio active', true);
     }
   };
@@ -1612,11 +1614,19 @@ function setStudioVolume(val) {
 
 function startStudioLevelMeter(stream) {
   try {
+    if (studioLevelCtx) {
+      studioLevelCtx.close().catch(() => {});
+    }
     studioLevelCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src  = studioLevelCtx.createMediaStreamSource(stream);
+    if (studioLevelCtx.state === 'suspended') studioLevelCtx.resume();
+
+    // Use createMediaStreamSource — separate from audio element to avoid conflict
+    const clonedStream = stream.clone();
+    const src = studioLevelCtx.createMediaStreamSource(clonedStream);
     const analyser = studioLevelCtx.createAnalyser();
     analyser.fftSize = 256;
     src.connect(analyser);
+
     const data = new Uint8Array(analyser.frequencyBinCount);
     function draw() {
       studioLevelFrame = requestAnimationFrame(draw);
@@ -1628,7 +1638,6 @@ function startStudioLevelMeter(stream) {
       const d = $('studio-level-db');   if(d) d.textContent  = db+'dB';
     }
     draw();
-    if (studioLevelCtx.state === 'suspended') studioLevelCtx.resume();
   } catch(e) { console.warn('Studio level meter:', e.message); }
 }
 
