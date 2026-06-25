@@ -113,6 +113,18 @@ input:focus,select:focus{border-color:var(--amber)}
   color:var(--bright);border-radius:8px;padding:7px 10px;
   font-size:.78rem;cursor:pointer;
 }
+.cam-side-controls{
+  position:absolute;top:8px;right:8px;z-index:5;
+  display:flex;flex-direction:column;gap:6px;align-items:flex-end;
+}
+.cam-side-btn{
+  min-width:54px;padding:6px 8px;border-radius:8px;
+  background:rgba(8,11,18,.78);border:1px solid var(--border);
+  color:var(--bright);font-family:var(--fd);font-weight:700;
+  font-size:.68rem;cursor:pointer;
+}
+.cam-side-btn.off{border-color:var(--red);color:var(--red);background:rgba(224,72,88,.16)}
+.cam-side-btn.warn{border-color:var(--amber);color:var(--amber);background:rgba(240,160,48,.14)}
 .camera-tools{
   background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:12px;margin-bottom:14px;
@@ -148,7 +160,7 @@ input:focus,select:focus{border-color:var(--amber)}
   transition:width .05s linear;
 }
 .meter-db{font-family:var(--fm);font-size:.65rem;color:var(--subtle);width:36px;text-align:right}
-.status-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.status-row{display:none;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .pill{
   display:flex;align-items:center;gap:5px;
   font-family:var(--fm);font-size:.65rem;letter-spacing:.06em;
@@ -160,6 +172,13 @@ input:focus,select:focus{border-color:var(--amber)}
 .pill-dot.amber{background:var(--amber);animation:blink 1s infinite}
 .pill-dot.red{background:var(--red)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.view-mode-row{display:flex;justify-content:flex-end;margin-bottom:8px}
+.view-mode-btn{
+  padding:7px 12px;border:1px solid var(--border);border-radius:8px;
+  background:rgba(8,11,18,.78);color:var(--bright);
+  font-family:var(--fd);font-weight:700;font-size:.72rem;cursor:pointer;
+}
+.view-mode-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(240,160,48,.14)}
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .ctrl-btn{
   padding:12px;border:1px solid var(--border);border-radius:8px;
@@ -277,6 +296,9 @@ input:focus,select:focus{border-color:var(--amber)}
     <div class="pill"><div class="pill-dot" id="cam-dot"></div><span id="cam-label">Camera</span></div>
     <div class="pill"><div class="pill-dot" id="mic-dot"></div><span id="mic-label">Mic</span></div>
   </div>
+  <div class="view-mode-row">
+    <button class="view-mode-btn active" id="view-mode-btn" type="button">Multi view</button>
+  </div>
   <!-- Video stage: phone cam always shown, studio return shown alongside when active -->
   <div id="video-stage" style="width:100%;margin-bottom:12px">
 
@@ -286,8 +308,12 @@ input:focus,select:focus{border-color:var(--amber)}
         <video id="local-video" autoplay muted playsinline></video>
         <div class="focus-ring" id="focus-ring"></div>
         <div class="cam-label" id="cam-label-overlay">Your camera</div>
-        <button class="cam-tools-toggle" id="cam-tools-toggle">Zoom</button>
-        <button class="flip-btn" id="flip-btn">⟳ Flip</button>
+        <div class="cam-side-controls">
+          <button class="cam-side-btn" id="cam-side-cam" type="button">Cam</button>
+          <button class="cam-side-btn" id="cam-side-mic" type="button">Mic</button>
+          <button class="cam-side-btn" id="cam-tools-toggle" type="button">Zoom</button>
+          <button class="cam-side-btn" id="flip-btn" type="button">Flip</button>
+        </div>
       </div>
     </div>
 
@@ -297,11 +323,16 @@ input:focus,select:focus{border-color:var(--amber)}
       <!-- Phone cam panel — full width -->
       <div class="dual-video-panel" style="border:2px solid var(--teal)">
         <video id="dual-phone-video" autoplay muted playsinline></video>
+        <div class="focus-ring" id="focus-ring-dual"></div>
         <div style="position:absolute;bottom:6px;left:8px;font-family:var(--fm);font-size:.6rem;color:var(--teal);background:rgba(0,0,0,.7);padding:3px 8px;border-radius:10px">
           📷 Your camera
         </div>
-        <button class="flip-btn" id="flip-btn-dual" onclick="flipCamera()"
-          style="position:absolute;top:6px;right:6px">⟳</button>
+        <div class="cam-side-controls">
+          <button class="cam-side-btn" id="cam-side-cam-dual" type="button">Cam</button>
+          <button class="cam-side-btn" id="cam-side-mic-dual" type="button">Mic</button>
+          <button class="cam-side-btn" id="cam-tools-toggle-dual" type="button">Zoom</button>
+          <button class="cam-side-btn" id="flip-btn-dual" type="button">Flip</button>
+        </div>
       </div>
 
       <!-- Studio return panel — full width below -->
@@ -384,7 +415,7 @@ const S = {
   ws: null, peerId: null, roomId: null,
   localStream: null, facingMode: 'user',
   peers: new Map(),
-  micMuted: false, camOff: false,
+  micMuted: false, camOff: false, viewMode: 'multi',
   audioCtx: null, analyser: null, vuFrame: null,
   name: '', role: '', label: '',
   zoomMode: 'none', digitalZoom: 1, zoomCanvas: null, zoomCtx: null,
@@ -479,6 +510,7 @@ $('allow-btn').addEventListener('click', async () => {
     $('cam-label').textContent = 'Cam live';
     $('mic-dot').className = 'pill-dot green';
     $('mic-label').textContent = 'Mic live';
+    syncOverlayControls();
     setupVU();
     show('screen-live');
     connectWS();
@@ -587,12 +619,12 @@ function createPeerConnection(targetPeerId, initiate){
     const track = e.track;
     console.log('[Portal] Received track from studio:', track.kind);
     if (track.kind === 'audio') {
-      // Studio talkback — play through phone speaker
+      // Studio return audio — play through phone speaker
       const audio = document.getElementById('studio-talkback') || createTalkbackElement();
       const stream = e.streams[0] || new MediaStream([track]);
       audio.srcObject = stream;
       audio.play().catch(() => {});
-      chatLog('', '🎙 Studio talkback active', true);
+      chatLog('', 'Studio return audio active', true);
     }
     if (track.kind === 'video') {
       // Studio video return — show in return preview
@@ -695,8 +727,23 @@ function setupVU(){
 $('mute-btn').addEventListener('click', toggleMic);
 $('cam-btn').addEventListener('click', toggleCam);
 $('flip-btn').addEventListener('click', flipCamera);
+$('flip-btn-dual').addEventListener('click', flipCamera);
+$('cam-side-mic').addEventListener('click', toggleMic);
+$('cam-side-mic-dual').addEventListener('click', toggleMic);
+$('cam-side-cam').addEventListener('click', toggleCam);
+$('cam-side-cam-dual').addEventListener('click', toggleCam);
 $('cam-tools-toggle').addEventListener('click', () => {
   $('camera-tools').classList.toggle('open');
+  syncOverlayControls();
+});
+$('cam-tools-toggle-dual').addEventListener('click', () => {
+  $('camera-tools').classList.toggle('open');
+  syncOverlayControls();
+  $('camera-tools').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+$('view-mode-btn').addEventListener('click', () => {
+  S.viewMode = S.viewMode === 'multi' ? 'single' : 'multi';
+  applyViewMode();
 });
 $('zoom-slider').addEventListener('input', e => setCameraZoom(parseFloat(e.target.value)));
 $('enhance-mode').addEventListener('change', e => setEnhanceMode(e.target.value === 'on'));
@@ -710,6 +757,78 @@ $('local-video').parentElement.addEventListener('click', e => {
   if (e.target.closest('button')) return;
   tapToFocus(e);
 });
+$('dual-phone-video').parentElement.addEventListener('click', e => {
+  if (e.target.closest('button')) return;
+  tapToFocus(e);
+});
+
+function syncOverlayControls(){
+  const micText = S.micMuted ? 'Mic off' : 'Mic';
+  const camText = S.camOff ? 'Cam off' : 'Cam';
+  ['cam-side-mic','cam-side-mic-dual'].forEach(id => {
+    const btn = $(id);
+    if (!btn) return;
+    btn.textContent = micText;
+    btn.classList.toggle('off', S.micMuted);
+  });
+  ['cam-side-cam','cam-side-cam-dual'].forEach(id => {
+    const btn = $(id);
+    if (!btn) return;
+    btn.textContent = camText;
+    btn.classList.toggle('off', S.camOff);
+  });
+  ['cam-tools-toggle','cam-tools-toggle-dual'].forEach(id => {
+    const btn = $(id);
+    if (btn) btn.classList.toggle('warn', $('camera-tools').classList.contains('open'));
+  });
+}
+
+function updateViewModeButton(){
+  const btn = $('view-mode-btn');
+  if (!btn) return;
+  btn.textContent = S.viewMode === 'multi' ? 'Multi view' : 'Single view';
+  btn.classList.toggle('active', S.viewMode === 'multi');
+}
+
+function applyViewMode(){
+  updateViewModeButton();
+  const singleView = $('single-view');
+  const dualView = $('dual-view');
+  const hasReturn = !!VIEWS.studioStream;
+
+  if (S.viewMode === 'multi' && hasReturn) {
+    if (singleView) singleView.style.display = 'none';
+    if (dualView) {
+      dualView.classList.add('active');
+      dualView.style.setProperty('display', 'flex', 'important');
+      dualView.style.flexDirection = 'column';
+      dualView.style.gap = '10px';
+      dualView.style.width = '100%';
+    }
+    const dualPhone = $('dual-phone-video');
+    if (dualPhone) {
+      dualPhone.srcObject = S.localStream;
+      dualPhone.play().catch(() => {});
+    }
+    const studioVid = $('studio-return-video');
+    if (studioVid) {
+      studioVid.srcObject = VIEWS.studioStream;
+      studioVid.play().catch(() => {});
+    }
+    return;
+  }
+
+  if (dualView) {
+    dualView.classList.remove('active');
+    dualView.style.display = 'none';
+  }
+  if (singleView) singleView.style.display = 'block';
+  const vid = $('local-video');
+  if (vid) {
+    vid.srcObject = S.localStream;
+    vid.play().catch(() => {});
+  }
+}
 
 function toggleMic(){
   S.micMuted=!S.micMuted;
@@ -717,6 +836,8 @@ function toggleMic(){
   $('mute-btn').textContent = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
   $('mute-btn').classList.toggle('active-mute', S.micMuted);
   $('mic-dot').className = 'pill-dot ' + (S.micMuted ? 'red' : 'green');
+  $('mic-label').textContent = S.micMuted ? 'Mic off' : 'Mic live';
+  syncOverlayControls();
 }
 
 function toggleCam(){
@@ -725,6 +846,8 @@ function toggleCam(){
   $('cam-btn').textContent = S.camOff ? '🚫 Cam off' : '📷 Cam on';
   $('cam-btn').classList.toggle('active-cam', S.camOff);
   $('cam-dot').className = 'pill-dot ' + (S.camOff ? 'red' : 'green');
+  $('cam-label').textContent = S.camOff ? 'Cam off' : 'Cam live';
+  syncOverlayControls();
 }
 
 // FLIP — exact original working code
@@ -829,11 +952,13 @@ async function tapToFocus(e) {
   const box = e.currentTarget.getBoundingClientRect();
   const x = Math.max(0, Math.min(1, (e.clientX - box.left) / box.width));
   const y = Math.max(0, Math.min(1, (e.clientY - box.top) / box.height));
-  const ring = $('focus-ring');
-  ring.style.left = (x * 100) + '%';
-  ring.style.top = (y * 100) + '%';
-  ring.classList.add('show');
-  setTimeout(() => ring.classList.remove('show'), 650);
+  const ring = e.currentTarget.querySelector('.focus-ring') || $('focus-ring');
+  if (ring) {
+    ring.style.left = (x * 100) + '%';
+    ring.style.top = (y * 100) + '%';
+    ring.classList.add('show');
+    setTimeout(() => ring.classList.remove('show'), 650);
+  }
 
   const track = activeVideoTrack();
   const caps = track?.getCapabilities?.() || {};
@@ -1126,7 +1251,9 @@ async function switchCamera(){
     S.localStream = new MediaStream([...audioTracks, newTrack]);
     newTrack.enabled = !S.camOff;
     $('local-video').srcObject = S.localStream;
+    if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
     await $('local-video').play().catch(()=>{});
+    await $('dual-phone-video')?.play?.().catch(()=>{});
     updateCameraControls();
     await requestAutoFocus();
     if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
@@ -1143,7 +1270,9 @@ async function switchCamera(){
       if (restoreTrack) {
         S.localStream = new MediaStream([...audioTracks, restoreTrack]);
         $('local-video').srcObject = S.localStream;
+        if ($('dual-phone-video')) $('dual-phone-video').srcObject = S.localStream;
         await $('local-video').play().catch(()=>{});
+        await $('dual-phone-video')?.play?.().catch(()=>{});
         updateCameraControls();
         await requestAutoFocus();
         if (S.enhanceVideo || (S.zoomMode === 'digital' && wantedZoom > 1)) await setDigitalZoom(wantedZoom);
@@ -1175,55 +1304,18 @@ const VIEWS = {
   // Called when studio video return arrives — show dual panel
   activateStudio(stream) {
     this.studioStream = stream;
-
-    const singleView = $('single-view');
-    const dualView = $('dual-view');
-    if (!dualView) {
-      chatLog('', 'Studio return active, but video layout is missing', true);
-      return;
-    }
-
-    // Switch to dual view. Use inline style because the HTML starts with display:none.
-    if (singleView) singleView.style.display = 'none';
-    dualView.classList.add('active');
-    dualView.style.setProperty('display', 'flex', 'important');
-    dualView.style.flexDirection = 'column';
-    dualView.style.gap = '10px';
-    dualView.style.width = '100%';
-
-    // Phone cam in top panel
-    const dualPhone = $('dual-phone-video');
-    if (dualPhone) {
-      dualPhone.srcObject = S.localStream;
-      dualPhone.muted = true;
-      dualPhone.playsInline = true;
-      dualPhone.play().catch(() => {});
-    }
-
-    // Studio return in bottom panel
-    const studioVid = $('studio-return-video');
-    if (studioVid) {
-      studioVid.srcObject = stream;
-      studioVid.playsInline = true;
-      studioVid.play().catch(() => {});
-    }
+    applyViewMode();
 
     requestAnimationFrame(() => {
-      const rect = dualView.getBoundingClientRect();
-      chatLog('', 'Studio view active - two screens showing (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')', true);
+      const activeView = S.viewMode === 'multi' ? $('dual-view') : $('single-view');
+      const rect = activeView?.getBoundingClientRect?.() || { width: 0, height: 0 };
+      chatLog('', 'Studio return active - ' + S.viewMode + ' view (' + Math.round(rect.width) + 'x' + Math.round(rect.height) + ')', true);
     });
   },
 
   deactivateStudio() {
     this.studioStream = null;
-    const dualView = $('dual-view');
-    if (dualView) {
-      dualView.classList.remove('active');
-      dualView.style.display = 'none';
-    }
-    if ($('single-view')) $('single-view').style.display = 'block';
-    const vid = $('local-video');
-    if (vid) { vid.srcObject = S.localStream; vid.play().catch(() => {}); }
+    applyViewMode();
     chatLog('', 'Studio return closed', true);
   },
 };

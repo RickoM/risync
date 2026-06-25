@@ -1419,6 +1419,10 @@ const REC = {
   peakTimerL: null, peakTimerR: null,
   clippedL: false, clippedR: false,
   gainL: 0.8, gainR: 0.8,
+  returnAudioCtx: null,
+  returnAudioDest: null,
+  returnAudioTrack: null,
+  returnAudioSources: null,
   activeCamId: 'webcam',
   phoneCams: new Map(),
   phoneCount: 0,
@@ -1561,6 +1565,8 @@ const REC = {
         }
       });
       this.audioStream = stream;
+      this.connectMicToReturnAudio();
+      this.updateReturnAudioSenders();
       const src = this.audioCtx.createMediaStreamSource(stream);
       this.gainNode = this.audioCtx.createGain();
       this.gainNode.gain.value = (this.gainL + this.gainR) / 2;
@@ -1587,6 +1593,69 @@ const REC = {
     this.audioCtx = null;
     this.analyserL = null;
     this.analyserR = null;
+  },
+
+  ensureReturnAudio() {
+    if (!this.returnAudioCtx) {
+      this.returnAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+      this.returnAudioDest = this.returnAudioCtx.createMediaStreamDestination();
+      this.returnAudioSources = new WeakSet();
+      this.returnAudioTrack = this.returnAudioDest.stream.getAudioTracks()[0];
+      this.returnAudioTrack.enabled = true;
+    }
+    if (this.returnAudioCtx.state === 'suspended') this.returnAudioCtx.resume().catch(() => {});
+    return this.returnAudioDest.stream;
+  },
+
+  connectMicToReturnAudio() {
+    if (!this.audioStream) return null;
+    const returnStream = this.ensureReturnAudio();
+    if (this._returnMicConnected) return returnStream;
+    try {
+      const src = this.returnAudioCtx.createMediaStreamSource(this.audioStream);
+      const gain = this.returnAudioCtx.createGain();
+      gain.gain.value = 0.85;
+      src.connect(gain);
+      gain.connect(this.returnAudioDest);
+      this._returnMicConnected = true;
+    } catch(e) {
+      console.warn('[ReturnAudio] Mic route failed:', e.message);
+    }
+    return returnStream;
+  },
+
+  connectElementToReturnAudio(el) {
+    if (!el) return null;
+    const returnStream = this.ensureReturnAudio();
+    if (this.returnAudioSources?.has(el)) return returnStream;
+    try {
+      const src = this.returnAudioCtx.createMediaElementSource(el);
+      const gain = this.returnAudioCtx.createGain();
+      gain.gain.value = 1;
+      src.connect(gain);
+      gain.connect(this.returnAudioDest);
+      gain.connect(this.returnAudioCtx.destination);
+      this.returnAudioSources.add(el);
+      console.log('[ReturnAudio] Studio playback routed to phone');
+    } catch(e) {
+      console.warn('[ReturnAudio] Playback route failed:', e.message);
+    }
+    return returnStream;
+  },
+
+  async updateReturnAudioSenders() {
+    const returnStream = this.ensureReturnAudio();
+    this.connectMicToReturnAudio();
+    const track = returnStream.getAudioTracks()[0];
+    this.talkbackSenders?.forEach((senders, peerId) => {
+      const pc = this.phonePeers?.get(peerId);
+      if (!pc || pc.connectionState === 'closed') return;
+      if (senders.audio) {
+        senders.audio.replaceTrack(track).catch(() => {});
+      } else {
+        senders.audio = pc.addTrack(track, returnStream);
+      }
+    });
   },
 
   renderVUMeters(label) {
@@ -1764,7 +1833,9 @@ const REC = {
     try {
       if (this.videoStream) this.videoStream.getTracks().forEach(t => t.stop());
       this.videoStream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : { width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: deviceId
+          ? { deviceId: { exact: deviceId }, width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } }
+          : { width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 20, max: 24 } },
         audio: false
       });
       const v = $('webcam-video');
@@ -2009,15 +2080,14 @@ const REC = {
     this.talkbackSenders = this.talkbackSenders || new Map();
     this.talkbackSenders.set(peerId, { audio: null, video: null });
 
+    const returnAudioStream = this.connectMicToReturnAudio() || this.ensureReturnAudio();
+    const returnAudioTrack = returnAudioStream.getAudioTracks()[0];
+    if (returnAudioTrack) {
+      const sender = pc.addTrack(returnAudioTrack, returnAudioStream);
+      this.talkbackSenders.get(peerId).audio = sender;
+    }
+
     if (initiate) {
-      // Add studio mic (talkback) — always on, low volume
-      if (this.audioStream) {
-        const audioTrack = this.audioStream.getAudioTracks()[0];
-        if (audioTrack) {
-          const sender = pc.addTrack(audioTrack, this.audioStream);
-          this.talkbackSenders.get(peerId).audio = sender;
-        }
-      }
       // Video return off by default — added on demand via sendVideoReturn()
       const offer = await pc.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
       const hqOffer = new RTCSessionDescription({ type:'offer', sdp: REC.buildOpusSDP ? REC.buildOpusSDP(offer.sdp, REC.currentQuality||'studio') : setHighQualityOpus(offer.sdp) });
@@ -2051,11 +2121,21 @@ const REC = {
       if (!videoTrack) { toast('No video track on webcam stream'); return; }
 
       try {
+        await videoTrack.applyConstraints?.({
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 15, max: 20 },
+        }).catch(() => {});
         if (senders.video) {
           await senders.video.replaceTrack(videoTrack);
         } else {
           senders.video = pc.addTrack(videoTrack, videoStream);
         }
+        const params = senders.video.getParameters?.() || {};
+        params.encodings = params.encodings?.length ? params.encodings : [{}];
+        params.encodings[0].maxBitrate = 650000;
+        params.encodings[0].maxFramerate = 20;
+        await senders.video.setParameters?.(params).catch(() => {});
         // Renegotiate with phone
         const offer   = await pc.createOffer();
         const hqOffer = new RTCSessionDescription({ type:'offer', sdp: this.buildOpusSDP ? this.buildOpusSDP(offer.sdp, this.currentQuality||'studio') : offer.sdp });
@@ -2079,9 +2159,9 @@ const REC = {
   // Toggle talkback mic on/off
   setTalkback(peerId, enabled) {
     const senders = this.talkbackSenders?.get(peerId);
-    if (!senders?.audio) { toast('No studio mic selected'); return; }
+    if (!senders?.audio) { toast('No return audio connected'); return; }
     senders.audio.track.enabled = enabled;
-    toast(enabled ? '🎙 Talkback on' : '🎙 Talkback off');
+    toast(enabled ? 'Return audio on' : 'Return audio off');
   },
 
   // Toggle talkback button — push-to-talk style
@@ -2094,8 +2174,8 @@ const REC = {
     btn.style.borderColor  = next ? 'var(--amber)'          : 'var(--border)';
     btn.style.color        = next ? 'var(--amber)'          : 'var(--body)';
     btn.innerHTML = next
-      ? '🎙 Talkback <span style="font-size:.6rem">ON</span>'
-      : '🎙 Talkback <span style="font-size:.6rem;color:var(--subtle)">(hold)</span>';
+      ? 'Return audio <span style="font-size:.6rem">ON</span>'
+      : 'Return audio <span style="font-size:.6rem;color:var(--subtle)">OFF</span>';
     this.setTalkback(peerId, next);
   },
 
@@ -2374,9 +2454,10 @@ const REC = {
         <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:8px">Return to phone</div>
         <div style="display:flex;gap:8px">
           <button id="talkback-btn-${peerId.substring(0,6)}"
+            data-active="true"
             onclick="REC.toggleTalkback('${peerId}', this)"
-            style="flex:1;padding:9px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--body);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-            🎙 Talkback <span style="font-size:.6rem;color:var(--subtle)">(hold)</span>
+            style="flex:1;padding:9px;background:rgba(240,160,48,.2);border:1px solid var(--amber);border-radius:8px;color:var(--amber);font-family:var(--fm);font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            Return audio <span style="font-size:.6rem;color:var(--subtle)">ON</span>
           </button>
           <button id="vidreturn-btn-${peerId.substring(0,6)}"
             onclick="REC.toggleVideoReturn('${peerId}', this)"
@@ -2397,7 +2478,7 @@ const REC = {
         <div style="display:flex;gap:8px;display:none"><!-- spacer close --></div
         </div>
         <div style="font-family:var(--fm);font-size:.6rem;color:var(--muted);margin-top:6px;line-height:1.6">
-          Talkback sends studio mic to phone. Video return sends studio webcam — uses extra bandwidth.
+          Return audio sends studio mic and studio playback to phone. Video return sends studio webcam — uses extra bandwidth.
         </div>
       </div>
     `;
@@ -2776,7 +2857,14 @@ const REC = {
     $('trim-apply-btn').addEventListener('click', () => { $('trim-modal').classList.remove('open'); toast('Trim applied to take'); });
     $('trim-in').addEventListener('input', e => { if (this.trimTake) $('trim-in-val').textContent = fmt(this.trimTake.duration * e.target.value / 100); });
     $('trim-out').addEventListener('input', e => { if (this.trimTake) $('trim-out-val').textContent = fmt(this.trimTake.duration * e.target.value / 100); });
-    $('trim-play-btn').addEventListener('click', () => { if (this.trimTake) { const a = new Audio(this.trimTake.url); a.play(); } });
+    $('trim-play-btn').addEventListener('click', () => {
+      if (this.trimTake) {
+        const a = new Audio(this.trimTake.url);
+        this.connectElementToReturnAudio(a);
+        this.updateReturnAudioSenders();
+        a.play();
+      }
+    });
   },
 };
 
@@ -2842,7 +2930,13 @@ function renderStudioStems(filename){
 
 $('master-play-btn').addEventListener('click', ()=>{
   if(!S.audioBuffer) return;
-  if(!S.masterAudio){ S.masterAudio = new Audio(URL.createObjectURL(S.audioFile||new Blob([]))); }
+  if(!S.masterAudio){
+    S.masterAudio = new Audio(URL.createObjectURL(S.audioFile||new Blob([])));
+    REC.connectElementToReturnAudio(S.masterAudio);
+    REC.updateReturnAudioSenders();
+  }
+  REC.connectElementToReturnAudio(S.masterAudio);
+  REC.updateReturnAudioSenders();
   S.masterAudio.paused ? S.masterAudio.play() : S.masterAudio.pause();
   $('master-play-btn').textContent = S.masterAudio.paused ? '▶ Play' : '⏸ Pause';
 });
