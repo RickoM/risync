@@ -769,6 +769,14 @@ label.field-label{
             </div>
             <span id="webcam-mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:34px;text-align:right;flex-shrink:0">—dB</span>
           </div>
+          <!-- AUDIO row: studio audio source sent to phone return -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">AUDIO</span>
+            <select id="webcam-audio-select-inline" onchange="REC.selectStudioAudioSource(this.value)"
+              style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
+              <option value="">Select audio source...</option>
+            </select>
+          </div>
           <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
             <span class="src-ctrl-label">GAIN</span>
@@ -1586,6 +1594,7 @@ const REC = {
   async enumDevices() {
     const devices = await navigator.mediaDevices.enumerateDevices();
     this.renderAudioDevices(devices.filter(d => d.kind === 'audioinput'));
+    this.populateInlineAudioSelect(devices.filter(d => d.kind === 'audioinput'));
     this.renderVideoDevices(devices.filter(d => d.kind === 'videoinput'));
   },
 
@@ -1607,6 +1616,7 @@ const REC = {
     const list = $('device-list');
     if (!devices.length) {
       list.innerHTML = '<div style="font-family:var(--fm);font-size:.72rem;color:var(--subtle)">No audio inputs found. Check connections.</div>';
+      this.populateInlineAudioSelect([]);
       return;
     }
     list.innerHTML = devices.map((d, i) => {
@@ -1646,6 +1656,45 @@ const REC = {
     }).join('');
   },
 
+  populateInlineAudioSelect(devices) {
+    const sel = $('webcam-audio-select-inline');
+    if (!sel) return;
+    if (!devices.length) {
+      sel.innerHTML = '<option value="">No audio inputs found</option>';
+      return;
+    }
+    const current = this.selectedDeviceId || sel.value || '';
+    sel.innerHTML = '<option value="">Select audio source...</option>' + devices.map((d, i) => {
+      const label = d.label || `Audio Input ${i + 1}`;
+      return `<option value="${d.deviceId}">${label}</option>`;
+    }).join('');
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  },
+
+  async selectStudioAudioSource(deviceId) {
+    const sel = $('webcam-audio-select-inline');
+    const label = sel?.selectedOptions?.[0]?.textContent || 'Audio source';
+    if (!deviceId) {
+      this.selectedDeviceId = null;
+      this.stopAudioMonitor();
+      document.querySelectorAll('.device-card.selected').forEach(c => c.classList.remove('selected'));
+      $('rec-btn').disabled = true;
+      $('rec-status').textContent = 'Select an audio input to begin';
+      $('live-wave-device').textContent = 'No device selected';
+      return;
+    }
+
+    this.selectedDeviceId = deviceId;
+    document.querySelectorAll('.device-card.selected').forEach(c => c.classList.remove('selected'));
+    const card = document.querySelector(`.device-card[data-id="${CSS.escape(deviceId)}"]`);
+    if (card) card.classList.add('selected');
+    await this.startAudioMonitor(deviceId, label);
+    $('rec-btn').disabled = false;
+    $('rec-status').textContent = `${label.split('(')[0].trim()} ready — hit record`;
+    $('live-wave-device').textContent = label.split('(')[0].trim() || label;
+    toast('Studio audio source: ' + label.split('(')[0].trim());
+  },
+
   toggleOpt(btn, opt) {
     btn.classList.toggle('active');
   },
@@ -1663,6 +1712,7 @@ const REC = {
     if (card.classList.contains('selected')) {
       card.classList.remove('selected');
       this.selectedDeviceId = null;
+      if ($('webcam-audio-select-inline')) $('webcam-audio-select-inline').value = '';
       this.stopAudioMonitor();
       $('rec-btn').disabled = true;
       $('rec-status').textContent = 'Select an audio input to begin';
@@ -1672,6 +1722,7 @@ const REC = {
       document.querySelectorAll('.device-card.selected').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       this.selectedDeviceId = deviceId;
+      if ($('webcam-audio-select-inline')) $('webcam-audio-select-inline').value = deviceId;
       await this.startAudioMonitor(deviceId, label);
       $('rec-btn').disabled = false;
       $('rec-status').textContent = `${label.split('(')[0].trim()} ready — hit record`;
