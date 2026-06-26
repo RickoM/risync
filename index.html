@@ -799,9 +799,9 @@ label.field-label{
             <span class="src-ctrl-label">GAIN</span>
             <input type="range" id="webcam-gain-slider" min="0" max="4" step="0.05" value="1"
               style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
-              oninput="REC.setWebcamGain(this.value)">
+              oninput="REC.setStudioMicGain(this.value)">
             <span id="webcam-gain-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:34px;text-align:right;flex-shrink:0">0 dB</span>
-            <button class="src-ctrl-btn" onclick="REC.autoGainWebcam()" style="margin-left:4px">Auto</button>
+            <button class="src-ctrl-btn" onclick="REC.autoGainStudioMic()" style="margin-left:4px">Auto</button>
           </div>
           <!-- SPK section -->
           <div class="src-ctrl-row" style="border-top:1px solid var(--border);padding-top:7px;margin-top:5px">
@@ -1539,6 +1539,8 @@ const REC = {
   mediaRecorder: null,
   videoStream: null,
   audioStream: null,
+  processedAudioStream: null,
+  processedAudioDest: null,
   mixedStream: null,
   recStartTime: null,
   recInterval: null,
@@ -1783,7 +1785,8 @@ const REC = {
   },
 
   async testStudioMicToSpeaker(btn) {
-    if (!this.audioStream?.getAudioTracks?.().length) {
+    const micTestStream = this.processedAudioStream || this.audioStream;
+    if (!micTestStream?.getAudioTracks?.().length) {
       toast('Select a studio AUDIO source first');
       return;
     }
@@ -1799,7 +1802,7 @@ const REC = {
     audio.playsInline = true;
     audio.muted = this.studioSpeakerMuted;
     audio.volume = this.studioSpeakerVolume;
-    audio.srcObject = this.audioStream;
+    audio.srcObject = micTestStream;
     document.body.appendChild(audio);
     this._studioLocalTestAudio = audio;
     await this.applyStudioSpeakerTo(audio);
@@ -1902,6 +1905,8 @@ const REC = {
       const src = this.audioCtx.createMediaStreamSource(stream);
       this.gainNode = this.audioCtx.createGain();
       this.gainNode.gain.value = (this.gainL + this.gainR) / 2;
+      this.processedAudioDest = this.audioCtx.createMediaStreamDestination();
+      this.processedAudioStream = this.processedAudioDest.stream;
       const splitter = this.audioCtx.createChannelSplitter(2);
       this.analyserL = this.audioCtx.createAnalyser();
       this.analyserR = this.audioCtx.createAnalyser();
@@ -1909,6 +1914,7 @@ const REC = {
       this.analyserR.fftSize = 2048;
       src.connect(this.gainNode);
       this.gainNode.connect(splitter);
+      this.gainNode.connect(this.processedAudioDest);
       splitter.connect(this.analyserL, 0);
       splitter.connect(this.analyserR, 1);
       this.renderVUMeters(label);
@@ -1923,6 +1929,8 @@ const REC = {
     this.audioStream?.getTracks().forEach(t => t.stop());
     this.audioCtx?.close();
     this.audioCtx = null;
+    this.processedAudioDest = null;
+    this.processedAudioStream = null;
     this.analyserL = null;
     this.analyserR = null;
   },
@@ -2092,7 +2100,7 @@ const REC = {
 
   connectMicToReturnAudio() {
     // Use audio interface stream if available, else use webcam mic
-    const micStream = this.audioStream;
+    const micStream = this.processedAudioStream || this.audioStream;
     if (!micStream) return null;
 
     const returnStream = this.ensureReturnAudio();
@@ -3567,6 +3575,48 @@ const REC = {
     const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
     const el = $('webcam-gain-val');
     if (el) el.textContent = (db > 0 ? '+' : '') + db + ' dB';
+  },
+
+  setStudioMicGain(val) {
+    const v = parseFloat(val);
+    this.gainL = v;
+    this.gainR = v;
+    if (this.gainNode) this.gainNode.gain.value = v;
+    if (this._returnMicGain) this._returnMicGain.gain.value = 1;
+    const db = v === 0 ? '-∞' : (20 * Math.log10(v)).toFixed(1);
+    const el = $('webcam-gain-val');
+    if (el) el.textContent = v === 0 ? '-∞ dB' : (db > 0 ? '+' : '') + db + ' dB';
+  },
+
+  async autoGainStudioMic() {
+    if (!this.analyserL && !this.analyserR) return;
+    const btn = document.querySelector('[onclick="REC.autoGainStudioMic()"]');
+    if (btn) btn.textContent = '...';
+    const TARGET = -18;
+    const samples = [];
+    const analyser = this.analyserL || this.analyserR;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    const start = Date.now();
+    await new Promise(resolve => {
+      const collect = () => {
+        if (Date.now() - start > 3000) { resolve(); return; }
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a,b)=>a+b,0)/data.length;
+        if (avg > 0) samples.push(avg);
+        requestAnimationFrame(collect);
+      };
+      collect();
+    });
+    if (!samples.length) { if (btn) btn.textContent = 'Auto'; return; }
+    const avgLevel = samples.reduce((a,b)=>a+b,0)/samples.length;
+    const currentDB = 20 * Math.log10(avgLevel / 128);
+    const diff = TARGET - currentDB;
+    const newGain = Math.min(4, Math.max(0.1, Math.pow(10, diff / 20)));
+    const slider = $('webcam-gain-slider');
+    if (slider) slider.value = newGain;
+    this.setStudioMicGain(newGain);
+    if (btn) { btn.textContent = 'OK'; setTimeout(() => btn.textContent = 'Auto', 1500); }
+    toast('Studio mic gain set to ' + (20*Math.log10(newGain)).toFixed(1) + ' dB');
   },
 
   async autoGainWebcam() {
