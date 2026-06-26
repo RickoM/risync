@@ -732,23 +732,6 @@ label.field-label{
   <!-- ── LEFT COLUMN ── -->
   <div>
 
-    <!-- Session chat -->
-    <div class="card" id="session-chat-card" style="display:block;margin-bottom:12px">
-      <div class="card-title" style="margin-bottom:10px">Session chat</div>
-      <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px">
-        <div style="color:var(--subtle)">» Create a session, then use this chat to check if the remote person can see and hear you.</div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you see my camera?')">Can you see me?</button>
-        <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you hear me clearly?')">Can you hear me?</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <input type="text" id="session-chat-input" placeholder="Ask: can you see and hear me?" style="flex:1">
-        <button class="btn btn-ghost btn-sm" id="session-chat-diag">Diag</button>
-        <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
-      </div>
-    </div>
-
     <!-- Camera Grid -->
     <span class="slabel">Cameras</span>
     <div class="cam-grid" id="cam-grid">
@@ -4142,7 +4125,7 @@ function showSessionLive(msg){
   $('session-setup-card').style.display='none';
   $('session-live-card').style.display='block';
   $('participants-card').style.display='block';
-  $('session-chat-card').style.display='block';
+  if ($('session-chat-card')) $('session-chat-card').style.display='block';
   $('remote-mix-card').style.display='block';
   $('session-live-name').textContent = msg.room.sessionName;
   $('room-code-display').textContent = msg.roomId;
@@ -4309,20 +4292,20 @@ function quickSessionMessage(text){
   send2({type:'chat',text});
   sessionLog(`You: ${text}`, false);
 }
-$('session-chat-send').addEventListener('click',()=>{
-  const t=$('session-chat-input').value.trim();
+$('session-chat-send')?.addEventListener('click',()=>{
+  const t=$('session-chat-input')?.value.trim();
   if(!t) return;
-  if(t.toLowerCase()==='/diag'){ sendSessionDiagnostics(); $('session-chat-input').value=''; return; }
+  if(t.toLowerCase()==='/diag'){ sendSessionDiagnostics(); if ($('session-chat-input')) $('session-chat-input').value=''; return; }
   if(!SESSION.ws || SESSION.ws.readyState!==1){
     sessionLog('Create a session before sending chat.');
     return;
   }
   send2({type:'chat',text:t});
   sessionLog(`You: ${t}`, false);
-  $('session-chat-input').value='';
+  if ($('session-chat-input')) $('session-chat-input').value='';
 });
-$('session-chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') $('session-chat-send').click(); });
-$('session-chat-diag').addEventListener('click', sendSessionDiagnostics);
+$('session-chat-input')?.addEventListener('keydown',e=>{ if(e.key==='Enter') $('session-chat-send')?.click(); });
+$('session-chat-diag')?.addEventListener('click', sendSessionDiagnostics);
 
 function wsStateName(ws){
   return ['connecting','open','closing','closed'][ws?.readyState ?? 3] || 'unknown';
@@ -4381,7 +4364,7 @@ $('end-session-btn').addEventListener('click',()=>{
   $('session-live-card').style.display='none';
   $('session-setup-card').style.display='block';
   $('participants-card').style.display='none';
-  $('session-chat-card').style.display='block';
+  if ($('session-chat-card')) $('session-chat-card').style.display='block';
   $('remote-mix-card').style.display='none';
   $('camera-grid').innerHTML=`
     <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">

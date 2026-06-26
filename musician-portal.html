@@ -241,9 +241,14 @@ input:focus,select:focus{border-color:var(--amber)}
 .chat-box{
   background:var(--surface);border:1px solid var(--border);
   border-radius:10px;padding:12px 14px;
-  max-height:160px;overflow-y:auto;
+  max-height:120px;overflow-y:auto;
   font-family:var(--fm);font-size:.7rem;line-height:1.9;
   color:var(--body);margin-bottom:10px;
+}
+.chat-panel{margin-top:14px}
+.chat-title{
+  font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--subtle);margin-bottom:8px;
 }
 .chat-input-row{display:flex;gap:8px}
 .chat-input-row input{flex:1;padding:9px 12px}
@@ -347,13 +352,6 @@ input:focus,select:focus{border-color:var(--amber)}
   </div>
   <div class="view-mode-row">
     <button class="view-mode-btn active" id="view-mode-btn" type="button">View: Multi</button>
-  </div>
-  <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:7px">Session chat</div>
-  <div class="chat-box" id="chat-box"></div>
-  <div class="chat-input-row" style="margin-bottom:12px">
-    <input type="text" id="chat-input" placeholder="Send a message..." maxlength="200">
-    <button class="chat-send" id="chat-diag" style="background:var(--panel);color:var(--amber);border:1px solid var(--border)">Diag</button>
-    <button class="chat-send" id="chat-send">Send</button>
   </div>
   <!-- Video stage: phone cam always shown, studio return shown alongside when active -->
   <div id="video-stage" style="width:100%;margin-bottom:12px">
@@ -568,6 +566,15 @@ input:focus,select:focus{border-color:var(--amber)}
     <button class="ctrl-btn" id="mute-btn">🎤 Mic on</button>
     <button class="ctrl-btn" id="cam-btn">📷 Cam on</button>
   </div>
+  <div class="chat-panel">
+    <div class="chat-title">Session chat</div>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Message studio..." autocomplete="off">
+      <button class="chat-send" id="chat-diag" type="button">Diag</button>
+      <button class="chat-send" id="chat-send" type="button">Send</button>
+    </div>
+  </div>
   <button class="btn btn-secondary" id="leave-btn" style="margin-top:16px">Leave session</button>
 </div>
 
@@ -605,6 +612,10 @@ function showError(msg){ const e=$('join-error'); e.textContent=msg; e.classList
 function clearError(){ $('join-error').classList.remove('show'); }
 function chatLog(name, text, isSystem=false){
   const b=$('chat-box');
+  if (!b) {
+    console.log('[RISYNC chat]', isSystem ? text : `${name}: ${text}`);
+    return;
+  }
   b.innerHTML += `<div style="color:${isSystem?'var(--subtle)':'var(--body)'}"><span style="color:var(--amber)">${isSystem?'':name+': '}</span>${text}</div>`;
   b.scrollTop=b.scrollHeight;
 }
@@ -1627,16 +1638,16 @@ async function switchCamera(){
 
 // CHAT
 function sendChat(){
-  const text=$('chat-input').value.trim();
+  const text=$('chat-input')?.value.trim();
   if(!text) return;
-  if(text.toLowerCase()==='/diag'){ sendDiagnostics(); $('chat-input').value=''; return; }
+  if(text.toLowerCase()==='/diag'){ sendDiagnostics(); if ($('chat-input')) $('chat-input').value=''; return; }
   send({ type:'chat', text });
   chatLog('You', text);
-  $('chat-input').value='';
+  if ($('chat-input')) $('chat-input').value='';
 }
-$('chat-send').addEventListener('click', sendChat);
-$('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
-$('chat-diag').addEventListener('click', sendDiagnostics);
+$('chat-send')?.addEventListener('click', sendChat);
+$('chat-input')?.addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+$('chat-diag')?.addEventListener('click', sendDiagnostics);
 
 async function sendDiagnostics(){
   const pcs = [...S.peers.entries()];
