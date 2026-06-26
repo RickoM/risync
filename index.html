@@ -732,6 +732,23 @@ label.field-label{
   <!-- ── LEFT COLUMN ── -->
   <div>
 
+    <!-- Session chat -->
+    <div class="card" id="session-chat-card" style="display:block;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:10px">Session chat</div>
+      <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px">
+        <div style="color:var(--subtle)">» Create a session, then use this chat to check if the remote person can see and hear you.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you see my camera?')">Can you see me?</button>
+        <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you hear me clearly?')">Can you hear me?</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" id="session-chat-input" placeholder="Ask: can you see and hear me?" style="flex:1">
+        <button class="btn btn-ghost btn-sm" id="session-chat-diag">Diag</button>
+        <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
+      </div>
+    </div>
+
     <!-- Camera Grid -->
     <span class="slabel">Cameras</span>
     <div class="cam-grid" id="cam-grid">
@@ -1372,22 +1389,6 @@ label.field-label{
 
     <!-- RIGHT: Camera grid -->
     <div>
-      <!-- Session chat -->
-      <div class="card" id="session-chat-card" style="display:block;margin-bottom:12px">
-        <div class="card-title" style="margin-bottom:10px">Session chat</div>
-        <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px">
-          <div style="color:var(--subtle)">» Create a session, then use this chat to check if the remote person can see and hear you.</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you see my camera?')">Can you see me?</button>
-          <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you hear me clearly?')">Can you hear me?</button>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="text" id="session-chat-input" placeholder="Ask: can you see and hear me?" style="flex:1">
-          <button class="btn btn-ghost btn-sm" id="session-chat-diag">Diag</button>
-          <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
-        </div>
-      </div>
       <span class="slabel">Camera Grid</span>
       <div id="camera-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">
