@@ -785,6 +785,7 @@ label.field-label{
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
               <option value="">Browser default speaker</option>
             </select>
+            <button class="src-ctrl-btn" onclick="REC.testStudioMicToSpeaker(this)" style="margin-left:4px">Test</button>
           </div>
           <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
@@ -1707,6 +1708,45 @@ const REC = {
       console.warn('[AudioOutput] Studio speaker select failed:', e.message);
       toast('Speaker select failed: ' + e.message);
     }
+  },
+
+  async testStudioMicToSpeaker(btn) {
+    if (!this.audioStream?.getAudioTracks?.().length) {
+      toast('Select an AUDIO source first');
+      return;
+    }
+    if (this._studioLocalTestAudio) {
+      this._studioLocalTestAudio.pause();
+      this._studioLocalTestAudio.srcObject = null;
+      this._studioLocalTestAudio.remove();
+      this._studioLocalTestAudio = null;
+    }
+
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.muted = false;
+    audio.volume = 0.55;
+    audio.srcObject = this.audioStream;
+    document.body.appendChild(audio);
+    this._studioLocalTestAudio = audio;
+    await this.applyStudioSpeakerTo(audio);
+
+    const oldText = btn?.textContent || 'Test';
+    if (btn) btn.textContent = 'Live';
+    audio.play()
+      .then(() => toast('Mic test live for 5 seconds'))
+      .catch(e => toast('Mic test blocked: ' + e.message));
+
+    window.clearTimeout(this._studioLocalTestTimer);
+    this._studioLocalTestTimer = window.setTimeout(() => {
+      audio.pause();
+      audio.srcObject = null;
+      audio.remove();
+      if (this._studioLocalTestAudio === audio) this._studioLocalTestAudio = null;
+      if (btn) btn.textContent = oldText;
+      toast('Mic test stopped');
+    }, 5000);
   },
 
   async selectStudioAudioSource(deviceId) {
