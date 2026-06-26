@@ -812,10 +812,8 @@ function createPeerConnection(targetPeerId, initiate){
   // Handle incoming tracks from studio (audio + video return)
   pc.ontrack = e => {
     const track = e.track;
-    const stream = e.streams[0];
+    const stream = e.streams[0] || new MediaStream([track]);
     console.log('[Portal] Track from studio:', track.kind, 'stream tracks:', stream?.getTracks().length);
-
-    if (!stream) return;
 
     if (track.kind === 'video') {
       // Video arrived — attach full stream (includes audio) to studio-return-video
@@ -829,10 +827,12 @@ function createPeerConnection(targetPeerId, initiate){
         audioEl = document.createElement('audio');
         audioEl.id = 'studio-audio-return';
         audioEl.autoplay = true;
+        audioEl.playsInline = true;
         audioEl.muted = false;
         document.body.appendChild(audioEl);
       }
-      audioEl.srcObject = stream;
+      const audioStream = stream.getAudioTracks().length ? stream : new MediaStream([track]);
+      audioEl.srcObject = audioStream;
       audioEl.muted = false;
       audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.8);
 
@@ -852,7 +852,7 @@ function createPeerConnection(targetPeerId, initiate){
       }
 
       // Start level meter for studio audio
-      startStudioLevelMeter(stream);
+      startStudioLevelMeter(audioStream);
       chatLog('', '🔊 Studio audio active', true);
     }
   };

@@ -776,6 +776,7 @@ label.field-label{
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
               <option value="">Select audio source...</option>
             </select>
+            <button class="src-ctrl-btn" onclick="REC.playReturnTestTone()" style="margin-left:4px">Tone</button>
           </div>
           <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
@@ -2008,6 +2009,27 @@ const REC = {
         }
       }
     });
+  },
+
+  playReturnTestTone() {
+    const returnStream = this.ensureReturnAudio();
+    this.updateReturnAudioSenders();
+    try {
+      const osc = this.returnAudioCtx.createOscillator();
+      const gain = this.returnAudioCtx.createGain();
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, this.returnAudioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, this.returnAudioCtx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.returnAudioCtx.currentTime + 1.0);
+      osc.connect(gain);
+      gain.connect(this.returnAudioDest);
+      osc.start();
+      osc.stop(this.returnAudioCtx.currentTime + 1.05);
+      toast('Sent test tone to phone return');
+      console.log('[ReturnAudio] Test tone sent, tracks:', returnStream.getAudioTracks().length);
+    } catch(e) {
+      toast('Tone failed: ' + e.message);
+    }
   },
 
   renderVUMeters(label) {
