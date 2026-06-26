@@ -1373,9 +1373,11 @@ label.field-label{
     <!-- RIGHT: Camera grid -->
     <div>
       <!-- Session chat -->
-      <div class="card" id="session-chat-card" style="display:none;margin-bottom:12px">
+      <div class="card" id="session-chat-card" style="display:block;margin-bottom:12px">
         <div class="card-title" style="margin-bottom:10px">Session chat</div>
-        <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px"></div>
+        <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px">
+          <div style="color:var(--subtle)">» Create a session, then use this chat to check if the remote person can see and hear you.</div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you see my camera?')">Can you see me?</button>
           <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you hear me clearly?')">Can you hear me?</button>
@@ -4217,6 +4219,10 @@ function sessionLog(text, isSystem=true){
   box.scrollTop=box.scrollHeight;
 }
 function quickSessionMessage(text){
+  if(!SESSION.ws || SESSION.ws.readyState!==1){
+    sessionLog('Create a session before sending chat.');
+    return;
+  }
   send2({type:'chat',text});
   sessionLog(`You: ${text}`, false);
 }
@@ -4224,6 +4230,10 @@ $('session-chat-send').addEventListener('click',()=>{
   const t=$('session-chat-input').value.trim();
   if(!t) return;
   if(t.toLowerCase()==='/diag'){ sendSessionDiagnostics(); $('session-chat-input').value=''; return; }
+  if(!SESSION.ws || SESSION.ws.readyState!==1){
+    sessionLog('Create a session before sending chat.');
+    return;
+  }
   send2({type:'chat',text:t});
   sessionLog(`You: ${t}`, false);
   $('session-chat-input').value='';
@@ -4286,7 +4296,7 @@ $('end-session-btn').addEventListener('click',()=>{
   $('session-live-card').style.display='none';
   $('session-setup-card').style.display='block';
   $('participants-card').style.display='none';
-  $('session-chat-card').style.display='none';
+  $('session-chat-card').style.display='block';
   $('remote-mix-card').style.display='none';
   $('camera-grid').innerHTML=`
     <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">

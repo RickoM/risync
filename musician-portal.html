@@ -348,6 +348,13 @@ input:focus,select:focus{border-color:var(--amber)}
   <div class="view-mode-row">
     <button class="view-mode-btn active" id="view-mode-btn" type="button">View: Multi</button>
   </div>
+  <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:7px">Session chat</div>
+  <div class="chat-box" id="chat-box"></div>
+  <div class="chat-input-row" style="margin-bottom:12px">
+    <input type="text" id="chat-input" placeholder="Send a message..." maxlength="200">
+    <button class="chat-send" id="chat-diag" style="background:var(--panel);color:var(--amber);border:1px solid var(--border)">Diag</button>
+    <button class="chat-send" id="chat-send">Send</button>
+  </div>
   <!-- Video stage: phone cam always shown, studio return shown alongside when active -->
   <div id="video-stage" style="width:100%;margin-bottom:12px">
 
@@ -561,12 +568,6 @@ input:focus,select:focus{border-color:var(--amber)}
     <button class="ctrl-btn" id="mute-btn">🎤 Mic on</button>
     <button class="ctrl-btn" id="cam-btn">📷 Cam on</button>
   </div>
-  <div style="font-family:var(--fm);font-size:.63rem;letter-spacing:.12em;text-transform:uppercase;color:var(--subtle);margin-bottom:7px">Session chat</div>
-  <div class="chat-box" id="chat-box"></div>
-  <div class="chat-input-row">
-    <input type="text" id="chat-input" placeholder="Send a message..." maxlength="200">
-    <button class="chat-send" id="chat-send">Send</button>
-  </div>
   <button class="btn btn-secondary" id="leave-btn" style="margin-top:16px">Leave session</button>
 </div>
 
@@ -597,6 +598,8 @@ const S = {
 // UTILS
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+let lastMicPct = 0, lastMicDb = '-∞';
+let lastStudioPct = 0, lastStudioDb = '-∞';
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
 function showError(msg){ const e=$('join-error'); e.textContent=msg; e.classList.add('show'); }
 function clearError(){ $('join-error').classList.remove('show'); }
@@ -604,6 +607,9 @@ function chatLog(name, text, isSystem=false){
   const b=$('chat-box');
   b.innerHTML += `<div style="color:${isSystem?'var(--subtle)':'var(--body)'}"><span style="color:var(--amber)">${isSystem?'':name+': '}</span>${text}</div>`;
   b.scrollTop=b.scrollHeight;
+}
+function wsStateName(ws){
+  return ['connecting','open','closing','closed'][ws?.readyState ?? 3] || 'unknown';
 }
 
 // AUTO-FILL ROOM CODE
@@ -960,6 +966,8 @@ function setupVU(){
     const avg=data.reduce((a,b)=>a+b,0)/data.length;
     const pct=Math.min(100,avg/128*200);
     const db=pct>0?Math.round(20*Math.log10(pct/100)):'-∞';
+    lastMicPct = pct;
+    lastMicDb = db + 'dB';
     const fill = $('mic-meter'); if(fill) fill.style.width=pct+'%';
     const dbEl = $('mic-db'); if(dbEl) dbEl.textContent=db+'dB';
     const fillD = $('mic-meter-dual'); if(fillD) fillD.style.width=pct+'%';
@@ -1577,12 +1585,49 @@ async function switchCamera(){
 function sendChat(){
   const text=$('chat-input').value.trim();
   if(!text) return;
+  if(text.toLowerCase()==='/diag'){ sendDiagnostics(); $('chat-input').value=''; return; }
   send({ type:'chat', text });
   chatLog('You', text);
   $('chat-input').value='';
 }
 $('chat-send').addEventListener('click', sendChat);
 $('chat-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+$('chat-diag').addEventListener('click', sendDiagnostics);
+
+async function sendDiagnostics(){
+  const pcs = [...S.peers.entries()];
+  const pc = pcs[0]?.[1] || null;
+  let rtt = 'n/a';
+  try {
+    if (pc) {
+      const stats = await pc.getStats();
+      stats.forEach(r => {
+        if (r.type === 'candidate-pair' && r.nominated && r.currentRoundTripTime != null) {
+          rtt = Math.round(r.currentRoundTripTime * 1000) + 'ms';
+        }
+      });
+    }
+  } catch(e) {}
+  const audioTracks = S.localStream?.getAudioTracks() || [];
+  const videoTracks = S.localStream?.getVideoTracks() || [];
+  const rawTracks = S.rawAudioStream?.getAudioTracks() || [];
+  const audioEl = document.getElementById('studio-audio-return');
+  const report = [
+    'DIAG phone',
+    'ws=' + wsStateName(S.ws),
+    'peers=' + pcs.length,
+    'pc=' + (pc ? pc.connectionState + '/' + pc.iceConnectionState : 'none'),
+    'rtt=' + rtt,
+    'micTracks=' + audioTracks.length + '/' + audioTracks.map(t => (t.enabled?'on':'off') + ':' + t.readyState).join(','),
+    'rawMic=' + rawTracks.length + '/' + rawTracks.map(t => t.readyState).join(','),
+    'camTracks=' + videoTracks.length + '/' + videoTracks.map(t => (t.enabled?'on':'off') + ':' + t.readyState).join(','),
+    'micLevel=' + Math.round(lastMicPct) + '%/' + lastMicDb,
+    'returnAudio=' + (audioEl ? (audioEl.paused?'paused':'playing') + '/muted=' + audioEl.muted + '/vol=' + audioEl.volume : 'missing'),
+    'returnLevel=' + Math.round(lastStudioPct) + '%/' + lastStudioDb
+  ].join(' | ');
+  send({ type:'chat', text: report });
+  chatLog('You', report);
+}
 
 // ── MULTI-VIEW CONTROLLER ────────────────────────────────────
 const VIEWS = {
@@ -1737,6 +1782,8 @@ function startStudioLevelMeter(stream) {
       const avg = data.reduce((a,b)=>a+b,0)/data.length;
       const pct = Math.min(100, avg/128*200);
       const db  = pct>0 ? Math.round(20*Math.log10(pct/100)) : '-∞';
+      lastStudioPct = pct;
+      lastStudioDb = db + 'dB';
       const m = $('studio-level-meter'); if(m) m.style.width = pct+'%';
       const d = $('studio-level-db');   if(d) d.textContent  = db+'dB';
     }
