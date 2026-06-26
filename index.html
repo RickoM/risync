@@ -776,7 +776,7 @@ label.field-label{
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
               <option value="">Select audio source...</option>
             </select>
-            <button class="src-ctrl-btn" onclick="REC.playReturnTestTone()" style="margin-left:4px">Tone</button>
+            <button class="src-ctrl-btn" onclick="REC.playReturnTestTone()" style="margin-left:4px">Phone Tone</button>
           </div>
           <!-- SPK row: studio speaker output for phone audio monitor -->
           <div class="src-ctrl-row">
@@ -785,7 +785,8 @@ label.field-label{
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
               <option value="">Browser default speaker</option>
             </select>
-            <button class="src-ctrl-btn" onclick="REC.testStudioMicToSpeaker(this)" style="margin-left:4px">Test</button>
+            <button class="src-ctrl-btn" onclick="REC.testStudioSpeakerTone(this)" style="margin-left:4px">SPK Tone</button>
+            <button class="src-ctrl-btn" onclick="REC.testStudioMicToSpeaker(this)" style="margin-left:4px">Micâ†’SPK</button>
           </div>
           <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
@@ -1710,9 +1711,44 @@ const REC = {
     }
   },
 
+  async testStudioSpeakerTone(btn) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    const dest = ctx.createMediaStreamDestination();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.0);
+    osc.connect(gain);
+    gain.connect(dest);
+
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.muted = false;
+    audio.volume = 0.6;
+    audio.srcObject = dest.stream;
+    document.body.appendChild(audio);
+    await this.applyStudioSpeakerTo(audio);
+
+    const oldText = btn?.textContent || 'SPK Tone';
+    if (btn) btn.textContent = 'Playing';
+    audio.play().then(() => toast('Studio speaker tone playing')).catch(e => toast('Speaker tone blocked: ' + e.message));
+    osc.start();
+    osc.stop(ctx.currentTime + 1.05);
+    window.setTimeout(() => {
+      audio.pause();
+      audio.srcObject = null;
+      audio.remove();
+      ctx.close().catch(() => {});
+      if (btn) btn.textContent = oldText;
+    }, 1200);
+  },
+
   async testStudioMicToSpeaker(btn) {
     if (!this.audioStream?.getAudioTracks?.().length) {
-      toast('Select an AUDIO source first');
+      toast('Select a studio AUDIO source first');
       return;
     }
     if (this._studioLocalTestAudio) {
@@ -1732,11 +1768,11 @@ const REC = {
     this._studioLocalTestAudio = audio;
     await this.applyStudioSpeakerTo(audio);
 
-    const oldText = btn?.textContent || 'Test';
+    const oldText = btn?.textContent || 'Micâ†’SPK';
     if (btn) btn.textContent = 'Live';
     audio.play()
-      .then(() => toast('Mic test live for 5 seconds'))
-      .catch(e => toast('Mic test blocked: ' + e.message));
+      .then(() => toast('Local studio mic is playing through selected speaker for 5 seconds'))
+      .catch(e => toast('Local mic test blocked: ' + e.message));
 
     window.clearTimeout(this._studioLocalTestTimer);
     this._studioLocalTestTimer = window.setTimeout(() => {
@@ -1745,7 +1781,7 @@ const REC = {
       audio.remove();
       if (this._studioLocalTestAudio === audio) this._studioLocalTestAudio = null;
       if (btn) btn.textContent = oldText;
-      toast('Mic test stopped');
+      toast('Local mic-to-speaker test stopped');
     }, 5000);
   },
 
@@ -2112,10 +2148,10 @@ const REC = {
       gain.connect(this.returnAudioDest);
       osc.start();
       osc.stop(this.returnAudioCtx.currentTime + 1.05);
-      toast(openPeers ? 'Sent test tone to phone return' : 'No phone connected for tone');
+      toast(openPeers ? 'Phone return tone sent' : 'Phone Tone needs a connected phone. Use SPK Tone or Micâ†’SPK for local studio tests.');
       console.log('[ReturnAudio] Test tone sent, peers:', openPeers, 'tracks:', returnStream.getAudioTracks().length);
     } catch(e) {
-      toast('Tone failed: ' + e.message);
+      toast('Phone tone failed: ' + e.message);
     }
   },
 
