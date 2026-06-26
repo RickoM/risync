@@ -377,10 +377,10 @@ input:focus,select:focus{border-color:var(--amber)}
           <td style="padding:7px 10px;background:var(--surface)">
             <div style="display:flex;align-items:center;gap:8px">
               <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:28px;flex-shrink:0">GAIN</span>
-              <input type="range" id="mic-gain-slider" min="0" max="2" step="0.05" value="0.75"
+              <input type="range" id="mic-gain-slider" min="0" max="2" step="0.05" value="1"
                 style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
                 oninput="setMicGain(this.value)">
-              <span id="mic-gain-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">-2.5 dB</span>
+              <span id="mic-gain-val" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0.0 dB</span>
               <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
                 style="font-family:var(--fm);font-size:.55rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;flex-shrink:0;letter-spacing:.02em">Auto</button>
             </div>
@@ -440,10 +440,10 @@ input:focus,select:focus{border-color:var(--amber)}
           <div class="cam-info-left">
             <div class="cam-info-row">
               <span class="cam-info-label">GAIN</span>
-              <input type="range" id="mic-gain-slider-dual" min="0" max="2" step="0.05" value="0.75"
+              <input type="range" id="mic-gain-slider-dual" min="0" max="2" step="0.05" value="1"
                 style="flex:1;height:3px;accent-color:var(--amber);cursor:pointer"
                 oninput="setMicGain(this.value)">
-              <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">-2.5 dB</span>
+              <span id="mic-gain-val-dual" style="font-family:var(--fm);font-size:.6rem;color:var(--amber);width:36px;text-align:right">0.0 dB</span>
               <button onclick="autoGainMic()" title="Auto-set gain to -18dBFS"
                 style="font-family:var(--fm);font-size:.55rem;padding:2px 7px;background:var(--amber-glow);border:1px solid var(--amber);border-radius:5px;color:var(--amber);cursor:pointer;letter-spacing:.02em">Auto</button>
             </div>
@@ -585,6 +585,7 @@ const ICE_SERVERS = [
 const S = {
   ws: null, peerId: null, roomId: null,
   localStream: null, facingMode: 'user',
+  rawAudioStream: null,
   peers: new Map(),
   micMuted: false, camOff: false, viewMode: 'multi',
   audioCtx: null, analyser: null, vuFrame: null,
@@ -1082,7 +1083,7 @@ function toggleMic(){
   S.micMuted = !S.micMuted;
   S.localStream.getAudioTracks().forEach(t => t.enabled = !S.micMuted);
   // Also update mic gain node if active
-  if (micGainNode) micGainNode.gain.value = S.micMuted ? 0 : parseFloat($('mic-gain-slider')?.value || 0.75);
+  if (micGainNode) micGainNode.gain.value = S.micMuted ? 0 : parseFloat($('mic-gain-slider')?.value || 1);
   const micText = S.micMuted ? 'Mic off' : 'Mic';
   const micIcon = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
   $('mute-btn').textContent = micIcon;
@@ -1775,11 +1776,14 @@ let micGainNode = null;
 function setupMicGain() {
   if (!S.localStream || !S.localStream.getAudioTracks().length) return;
   try {
+    const rawTrack = S.localStream.getAudioTracks()[0];
+    if (!rawTrack) return;
+    S.rawAudioStream = new MediaStream([rawTrack]);
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
-    const src  = ctx.createMediaStreamSource(S.localStream);
+    const src  = ctx.createMediaStreamSource(S.rawAudioStream);
     micGainNode = ctx.createGain();
-    micGainNode.gain.value = 0.75;
+    micGainNode.gain.value = 1;
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -18;
     limiter.knee.value = 12;
@@ -1795,7 +1799,7 @@ function setupMicGain() {
     const gainedTrack = dest.stream.getAudioTracks()[0];
     S.localStream.getAudioTracks().forEach(t => S.localStream.removeTrack(t));
     S.localStream.addTrack(gainedTrack);
-    setMicGain(0.75);
+    setMicGain(1);
 
     // Replace in peer connections
     S.peers.forEach(pc => {
