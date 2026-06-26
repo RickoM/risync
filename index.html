@@ -1368,19 +1368,24 @@ label.field-label{
         </div>
       </div>
 
-      <!-- Session chat -->
-      <div class="card mt16" id="session-chat-card" style="display:none">
-        <div class="card-title" style="margin-bottom:10px">Session chat</div>
-        <div class="log-box" id="session-chat-log" style="color:var(--body)"></div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="text" id="session-chat-input" placeholder="Message all participants..." style="flex:1">
-          <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
-        </div>
-      </div>
     </div>
 
     <!-- RIGHT: Camera grid -->
     <div>
+      <!-- Session chat -->
+      <div class="card" id="session-chat-card" style="display:none;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:10px">Session chat</div>
+        <div class="log-box" id="session-chat-log" style="color:var(--body);max-height:120px"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you see my camera?')">Can you see me?</button>
+          <button class="btn btn-secondary btn-sm" onclick="quickSessionMessage('Can you hear me clearly?')">Can you hear me?</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="text" id="session-chat-input" placeholder="Ask: can you see and hear me?" style="flex:1">
+          <button class="btn btn-ghost btn-sm" id="session-chat-diag">Diag</button>
+          <button class="btn btn-primary btn-sm" id="session-chat-send">Send</button>
+        </div>
+      </div>
       <span class="slabel">Camera Grid</span>
       <div id="camera-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div style="aspect-ratio:4/3;background:var(--panel2);border:1px dashed var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px">
@@ -2409,9 +2414,15 @@ const REC = {
 
     pc.ontrack = e => {
       console.log('[RISYNC] Got track from phone:', e.track.kind, 'streams:', e.streams.length);
+      const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
+      if (e.track.kind === 'audio') {
+        this.attachPhoneAudio(peerId, stream);
+        return;
+      }
       if (e.track.kind !== 'video') return;
-      if (e.streams && e.streams[0] && e.streams[0].getVideoTracks().length) {
-        this.attachPhoneVideo(peerId, e.streams[0]);
+      if (stream.getVideoTracks().length) {
+        this.attachPhoneVideo(peerId, stream);
+        if (stream.getAudioTracks().length) this.attachPhoneAudio(peerId, stream);
       } else if (e.track.kind === 'video') {
         // No stream object — create one from the track directly
         const stream = new MediaStream([e.track]);
@@ -2665,6 +2676,62 @@ const REC = {
     this.sigSend({ type:'answer', sdp: answer.sdp, fromPeerId: this.studioPeerId });
   },
 
+  attachPhoneAudio(peerId, stream) {
+    const audioTracks = stream?.getAudioTracks?.() || [];
+    if (!audioTracks.length) return;
+
+    let audio = $(`phone-audio-${peerId}`);
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = `phone-audio-${peerId}`;
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audio.muted = false;
+      audio.volume = 0.8;
+      document.body.appendChild(audio);
+    }
+    audio.srcObject = audioTracks.length === stream.getTracks().length ? stream : new MediaStream(audioTracks);
+    audio.muted = false;
+    audio.volume = 0.8;
+
+    audio.play().then(() => {
+      toast('Remote audio active');
+      $(`audio-btn-${peerId}`)?.remove();
+    }).catch(() => {
+      const tile = $(`cam-tile-${peerId}`);
+      if (!tile || $(`audio-btn-${peerId}`)) return;
+      const audioBtn = document.createElement('button');
+      audioBtn.id = `audio-btn-${peerId}`;
+      audioBtn.textContent = 'Enable audio';
+      audioBtn.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:3;background:var(--amber);color:var(--ink);border:none;border-radius:6px;padding:4px 8px;font-size:.65rem;cursor:pointer;font-family:var(--fm)';
+      audioBtn.onclick = () => {
+        audio.muted = false;
+        audio.play().then(() => { audioBtn.remove(); toast('Remote audio enabled'); }).catch(e => toast('Audio blocked: ' + e.message));
+      };
+      tile.appendChild(audioBtn);
+      toast('Click Enable audio on the phone tile');
+    });
+
+    try {
+      this.phoneAudioNodes = this.phoneAudioNodes || new Map();
+      const old = this.phoneAudioNodes.get(peerId);
+      if (old?.ctx) old.ctx.close().catch(() => {});
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      const src = ctx.createMediaStreamSource(new MediaStream(audioTracks));
+      const gain = ctx.createGain();
+      gain.gain.value = 1;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(gain);
+      gain.connect(analyser);
+      this.phoneAudioNodes.set(peerId, { ctx, gain, analyser, audio });
+      this.startPhoneAudioLevel(peerId, analyser);
+    } catch(e) {
+      console.warn('[RISYNC] Phone audio meter failed:', e.message);
+    }
+  },
+
   attachPhoneVideo(peerId, stream) {
     console.log('[RISYNC] Attaching video for peer:', peerId, 'stream tracks:', stream?.getTracks().length);
     
@@ -2690,8 +2757,8 @@ const REC = {
       audioBtn.textContent = '🔊 Enable audio';
       audioBtn.style.cssText = 'position:absolute;bottom:8px;right:8px;z-index:3;background:var(--amber);color:var(--ink);border:none;border-radius:6px;padding:4px 8px;font-size:.65rem;cursor:pointer;font-family:var(--fm)';
       audioBtn.onclick = () => {
-        const v = $(`phone-vid-${peerId}`);
-        if (v) { v.muted = false; v.play(); audioBtn.remove(); toast('Audio enabled'); }
+        const a = $(`phone-audio-${peerId}`);
+        if (a) { a.muted = false; a.play().then(() => { audioBtn.remove(); toast('Audio enabled'); }).catch(e => toast('Audio blocked: ' + e.message)); }
       };
       tile.appendChild(audioBtn);
     }
@@ -2703,8 +2770,8 @@ const REC = {
       vid.id = `phone-vid-${peerId}`;
       vid.autoplay = true;
       vid.playsinline = true;
-      vid.muted = false;  // allow phone audio through to studio
-      vid.volume = 0.8;
+      vid.muted = true;
+      vid.volume = 0;
       vid.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;z-index:1';
       tile.insertBefore(vid, tile.firstChild);
     }
@@ -3371,14 +3438,17 @@ const REC = {
 
   togglePhoneMic(peerId, btn) {
     const vid = $(`phone-vid-${peerId}`);
-    if (!vid?.srcObject) return;
+    const audio = $(`phone-audio-${peerId}`);
+    if (!vid?.srcObject && !audio?.srcObject) return;
     const off = btn.dataset.off === 'true';
     const next = !off;
     btn.dataset.off = next;
-    vid.srcObject.getAudioTracks().forEach(t => t.enabled = !next);
+    vid?.srcObject?.getAudioTracks().forEach(t => t.enabled = !next);
+    audio?.srcObject?.getAudioTracks().forEach(t => t.enabled = !next);
     // Also mute phone nodes
     const nodes = this.phoneAudioNodes?.get(peerId);
     if (nodes?.gain) nodes.gain.gain.value = next ? 0 : 1;
+    if (audio) audio.muted = next;
     btn.textContent = next ? 'Off' : 'On';
     btn.classList.toggle('off', next);
   },
@@ -3402,8 +3472,11 @@ const REC = {
   },
 
   setPhoneVolume(peerId, vol) {
-    const vid = $(`phone-vid-${peerId}`);
-    if (vid) vid.volume = Math.max(0, Math.min(1, vol));
+    const v = Math.max(0, Math.min(1, vol));
+    const audio = $(`phone-audio-${peerId}`);
+    if (audio) audio.volume = v;
+    const nodes = this.phoneAudioNodes?.get(peerId);
+    if (nodes?.gain) nodes.gain.gain.value = v;
   },
 
   mutePhone(peerId, btn) {
@@ -4143,14 +4216,57 @@ function sessionLog(text, isSystem=true){
   box.innerHTML+=`<div style="color:${isSystem?'var(--subtle)':'var(--body)'}">» ${text}</div>`;
   box.scrollTop=box.scrollHeight;
 }
+function quickSessionMessage(text){
+  send2({type:'chat',text});
+  sessionLog(`You: ${text}`, false);
+}
 $('session-chat-send').addEventListener('click',()=>{
   const t=$('session-chat-input').value.trim();
   if(!t) return;
+  if(t.toLowerCase()==='/diag'){ sendSessionDiagnostics(); $('session-chat-input').value=''; return; }
   send2({type:'chat',text:t});
   sessionLog(`You: ${t}`, false);
   $('session-chat-input').value='';
 });
 $('session-chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter') $('session-chat-send').click(); });
+$('session-chat-diag').addEventListener('click', sendSessionDiagnostics);
+
+function wsStateName(ws){
+  return ['connecting','open','closing','closed'][ws?.readyState ?? 3] || 'unknown';
+}
+
+async function sendSessionDiagnostics(){
+  const peers = [...(REC.phonePeers || new Map())];
+  const parts = [
+    'DIAG studio',
+    'ws=' + wsStateName(SESSION.ws || REC.sigWS),
+    'phones=' + peers.length
+  ];
+  for (const [peerId, pc] of peers) {
+    let rtt = 'n/a';
+    try {
+      const stats = await pc.getStats();
+      stats.forEach(r => {
+        if (r.type === 'candidate-pair' && r.nominated && r.currentRoundTripTime != null) {
+          rtt = Math.round(r.currentRoundTripTime * 1000) + 'ms';
+        }
+      });
+    } catch(e) {}
+    const recv = pc.getReceivers ? pc.getReceivers().map(r => r.track ? r.track.kind + ':' + r.track.readyState + ':' + (r.track.enabled?'on':'off') : 'empty').join(',') : 'n/a';
+    const senders = REC.talkbackSenders?.get(peerId) || {};
+    const sendAudio = senders.audio?.track ? senders.audio.track.readyState + ':' + (senders.audio.track.enabled?'on':'off') : 'none';
+    const sendVideo = senders.video?.track ? senders.video.track.readyState + ':' + (senders.video.track.enabled?'on':'off') : 'none';
+    parts.push(peerId.substring(0,6) + '=' + pc.connectionState + '/' + pc.iceConnectionState + '/rtt=' + rtt + '/recv=' + recv + '/sendA=' + sendAudio + '/sendV=' + sendVideo);
+  }
+  const audioTrack = REC.audioStream?.getAudioTracks?.()[0];
+  const returnTrack = REC.returnAudioTrack;
+  parts.push('studioAudio=' + (audioTrack ? audioTrack.readyState + ':' + (audioTrack.enabled?'on':'off') : 'none'));
+  parts.push('returnAudio=' + (returnTrack ? returnTrack.readyState + ':' + (returnTrack.enabled?'on':'off') : 'none'));
+  parts.push('webcam=' + (REC.videoStream ? REC.videoStream.getVideoTracks().map(t => t.readyState + ':' + (t.enabled?'on':'off')).join(',') : 'none'));
+  const report = parts.join(' | ');
+  send2({type:'chat', text: report});
+  sessionLog('You: ' + report, false);
+}
 
 // ── Recording mode ────────────────────────────────────────────
 window.setRecMode = (mode, btn)=>{
