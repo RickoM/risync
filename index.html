@@ -1951,8 +1951,7 @@ const REC = {
 
   connectMicToReturnAudio() {
     // Use audio interface stream if available, else use webcam mic
-    const micStream = this.audioStream
-      || (this.videoStream?.getAudioTracks().length ? this.videoStream : null);
+    const micStream = this.audioStream;
     if (!micStream) return null;
 
     const returnStream = this.ensureReturnAudio();
@@ -1985,7 +1984,6 @@ const REC = {
       gain.gain.value = 1;
       src.connect(gain);
       gain.connect(this.returnAudioDest);
-      gain.connect(this.returnAudioCtx.destination);
       this.returnAudioSources.add(el);
       console.log('[ReturnAudio] Studio playback routed to phone');
     } catch(e) {
@@ -1996,16 +1994,18 @@ const REC = {
 
   async updateReturnAudioSenders() {
     const returnStream = this.ensureReturnAudio();
-    this.connectMicToReturnAudio();
+    if (this.returnTalkbackEnabled) this.connectMicToReturnAudio();
     const track = returnStream.getAudioTracks()[0];
-    if (track) track.enabled = true;
     this.talkbackSenders?.forEach((senders, peerId) => {
       const pc = this.phonePeers?.get(peerId);
       if (!pc || pc.connectionState === 'closed') return;
       if (senders.audio) {
         senders.audio.replaceTrack(track).catch(() => {});
+        if (senders.audio.track) senders.audio.track.enabled = !!senders.returnEnabled;
       } else {
         senders.audio = pc.addTrack(track, returnStream);
+        senders.returnEnabled = false;
+        if (senders.audio.track) senders.audio.track.enabled = false;
         if (pc.signalingState === 'stable') {
           pc.createOffer()
             .then(offer => {
@@ -2490,11 +2490,13 @@ const REC = {
     this.talkbackSenders = this.talkbackSenders || new Map();
     this.talkbackSenders.set(peerId, { audio: null, video: null });
 
-    const returnAudioStream = this.connectMicToReturnAudio() || this.ensureReturnAudio();
+    const returnAudioStream = this.ensureReturnAudio();
     const returnAudioTrack = returnAudioStream.getAudioTracks()[0];
     if (returnAudioTrack) {
       const sender = pc.addTrack(returnAudioTrack, returnAudioStream);
       this.talkbackSenders.get(peerId).audio = sender;
+      this.talkbackSenders.get(peerId).returnEnabled = false;
+      sender.track.enabled = false;
     }
 
     if (initiate) {
@@ -2570,6 +2572,12 @@ const REC = {
   setTalkback(peerId, enabled) {
     const senders = this.talkbackSenders?.get(peerId);
     if (!senders?.audio) { toast('No return audio connected'); return; }
+    senders.returnEnabled = enabled;
+    this.returnTalkbackEnabled = enabled;
+    if (enabled) {
+      this._returnMicConnected = false;
+      this.connectMicToReturnAudio();
+    }
     senders.audio.track.enabled = enabled;
     toast(enabled ? 'Return audio on' : 'Return audio off');
   },
@@ -2587,6 +2595,83 @@ const REC = {
       ? 'Return audio <span style="font-size:.6rem">ON</span>'
       : 'Return audio <span style="font-size:.6rem;color:var(--subtle)">OFF</span>';
     this.setTalkback(peerId, next);
+  },
+
+  isolatePhoneAudio(peerId) {
+    const shortId = peerId.substring(0,6);
+    const audio = $(`phone-audio-${peerId}`);
+    if (audio) audio.muted = true;
+    const micBtn = $('phone-mic-btn-' + shortId);
+    if (micBtn) {
+      micBtn.dataset.off = 'true';
+      micBtn.textContent = 'Off';
+      micBtn.classList.add('off');
+    }
+    const talkBtn = $('talkback-btn-' + shortId);
+    if (talkBtn) {
+      talkBtn.dataset.active = 'false';
+      talkBtn.style.background = 'var(--panel2)';
+      talkBtn.style.borderColor = 'var(--border)';
+      talkBtn.style.color = 'var(--body)';
+      talkBtn.textContent = 'Talk OFF';
+    }
+    this.setTalkback(peerId, false);
+    toast('Audio isolated for this phone');
+    sessionLog('Audio isolated: remote monitor muted and return audio off.');
+  },
+
+  setPhoneMicState(peerId, enabled) {
+    const shortId = peerId.substring(0,6);
+    const vid = $(`phone-vid-${peerId}`);
+    const audio = $(`phone-audio-${peerId}`);
+    vid?.srcObject?.getAudioTracks().forEach(t => t.enabled = enabled);
+    audio?.srcObject?.getAudioTracks().forEach(t => t.enabled = enabled);
+    const micBtn = $('phone-mic-btn-' + shortId);
+    if (micBtn) {
+      micBtn.dataset.off = enabled ? 'false' : 'true';
+      micBtn.textContent = enabled ? 'On' : 'Off';
+      micBtn.classList.toggle('off', !enabled);
+    }
+    this.sigSend({ type:'host-audio-mode', targetPeerId:peerId, phoneMicMuted: !enabled });
+  },
+
+  setRemoteMonitorState(peerId, enabled) {
+    const audio = $(`phone-audio-${peerId}`);
+    if (audio) audio.muted = !enabled;
+  },
+
+  setTalkbackButtonState(peerId, enabled) {
+    const shortId = peerId.substring(0,6);
+    const btn = $('talkback-btn-' + shortId);
+    if (!btn) return;
+    btn.dataset.active = enabled ? 'true' : 'false';
+    btn.style.background = enabled ? 'rgba(240,160,48,.2)' : 'var(--panel2)';
+    btn.style.borderColor = enabled ? 'var(--amber)' : 'var(--border)';
+    btn.style.color = enabled ? 'var(--amber)' : 'var(--body)';
+    btn.textContent = enabled ? 'Return ON' : 'Talk OFF';
+  },
+
+  setDirectionalAudioMode(peerId, mode) {
+    if (mode === 'phone-to-studio') {
+      this.setTalkback(peerId, false);
+      this.setTalkbackButtonState(peerId, false);
+      this.setRemoteMonitorState(peerId, true);
+      this.setPhoneMicState(peerId, true);
+      this.sigSend({ type:'host-audio-mode', targetPeerId:peerId, phoneMicMuted:false, phoneSpeakerMuted:true, mode });
+      toast('Mode: phone to studio');
+      sessionLog('Mode set: Phone mic ON → Studio speakers ON. Return audio OFF.');
+      return;
+    }
+
+    if (mode === 'studio-to-phone') {
+      this.setRemoteMonitorState(peerId, false);
+      this.setPhoneMicState(peerId, false);
+      this.setTalkback(peerId, true);
+      this.setTalkbackButtonState(peerId, true);
+      this.sigSend({ type:'host-audio-mode', targetPeerId:peerId, phoneMicMuted:true, phoneSpeakerMuted:false, mode });
+      toast('Mode: studio to phone');
+      sessionLog('Mode set: Studio audio → Phone speaker ON. Phone mic OFF, Studio monitor OFF.');
+    }
   },
 
   // Toggle video return on/off
@@ -2722,13 +2807,10 @@ const REC = {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       if (ctx.state === 'suspended') ctx.resume();
       const src = ctx.createMediaStreamSource(new MediaStream(audioTracks));
-      const gain = ctx.createGain();
-      gain.gain.value = 1;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
-      src.connect(gain);
-      gain.connect(analyser);
-      this.phoneAudioNodes.set(peerId, { ctx, gain, analyser, audio });
+      src.connect(analyser);
+      this.phoneAudioNodes.set(peerId, { ctx, analyser, audio });
       this.startPhoneAudioLevel(peerId, analyser);
     } catch(e) {
       console.warn('[RISYNC] Phone audio meter failed:', e.message);
@@ -2926,8 +3008,13 @@ const REC = {
         </span>
         <button id="talkback-btn-${peerId.substring(0,6)}"
           onclick="REC.toggleTalkback('${peerId}', this)"
-          class="src-ctrl-btn" data-active="true"
-          style="border-color:var(--amber);color:var(--amber);background:rgba(240,160,48,.1)">🎙 Talk</button>
+          class="src-ctrl-btn" data-active="false">Talk OFF</button>
+        <button onclick="REC.isolatePhoneAudio('${peerId}')"
+          class="src-ctrl-btn" style="margin-left:4px;border-color:var(--red);color:var(--red)">Isolate</button>
+        <button onclick="REC.setDirectionalAudioMode('${peerId}', 'phone-to-studio')"
+          class="src-ctrl-btn" style="margin-left:4px;border-color:var(--teal);color:var(--teal)">Phone→Studio</button>
+        <button onclick="REC.setDirectionalAudioMode('${peerId}', 'studio-to-phone')"
+          class="src-ctrl-btn" style="margin-left:4px;border-color:var(--amber);color:var(--amber)">Studio→Phone</button>
         <button id="vidreturn-btn-${peerId.substring(0,6)}"
           onclick="REC.toggleVideoReturn('${peerId}', this)"
           class="src-ctrl-btn" style="margin-left:4px">📺 Return</button>
@@ -3448,9 +3535,6 @@ const REC = {
     btn.dataset.off = next;
     vid?.srcObject?.getAudioTracks().forEach(t => t.enabled = !next);
     audio?.srcObject?.getAudioTracks().forEach(t => t.enabled = !next);
-    // Also mute phone nodes
-    const nodes = this.phoneAudioNodes?.get(peerId);
-    if (nodes?.gain) nodes.gain.gain.value = next ? 0 : 1;
     if (audio) audio.muted = next;
     btn.textContent = next ? 'Off' : 'On';
     btn.classList.toggle('off', next);
@@ -3478,8 +3562,6 @@ const REC = {
     const v = Math.max(0, Math.min(1, vol));
     const audio = $(`phone-audio-${peerId}`);
     if (audio) audio.volume = v;
-    const nodes = this.phoneAudioNodes?.get(peerId);
-    if (nodes?.gain) nodes.gain.gain.value = v;
   },
 
   mutePhone(peerId, btn) {
@@ -4267,7 +4349,9 @@ async function sendSessionDiagnostics(){
     const senders = REC.talkbackSenders?.get(peerId) || {};
     const sendAudio = senders.audio?.track ? senders.audio.track.readyState + ':' + (senders.audio.track.enabled?'on':'off') : 'none';
     const sendVideo = senders.video?.track ? senders.video.track.readyState + ':' + (senders.video.track.enabled?'on':'off') : 'none';
-    parts.push(peerId.substring(0,6) + '=' + pc.connectionState + '/' + pc.iceConnectionState + '/rtt=' + rtt + '/recv=' + recv + '/sendA=' + sendAudio + '/sendV=' + sendVideo);
+    const mon = $(`phone-audio-${peerId}`);
+    const monState = mon ? (mon.muted?'muted':'on') + '/vol=' + mon.volume : 'none';
+    parts.push(peerId.substring(0,6) + '=' + pc.connectionState + '/' + pc.iceConnectionState + '/rtt=' + rtt + '/recv=' + recv + '/monitor=' + monState + '/return=' + (!!senders.returnEnabled) + '/sendA=' + sendAudio + '/sendV=' + sendVideo);
   }
   const audioTrack = REC.audioStream?.getAudioTracks?.()[0];
   const returnTrack = REC.returnAudioTrack;

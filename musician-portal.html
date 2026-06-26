@@ -795,6 +795,9 @@ async function handleMessage(msg){
       if(msg.muted && !S.micMuted) toggleMic();
       chatLog('', 'You were muted by the host', true);
       break;
+    case 'host-audio-mode':
+      applyHostAudioMode(msg);
+      break;
     case 'return-label':
       if ($('studio-return-label')) $('studio-return-label').textContent = msg.label || 'Studio';
       break;
@@ -1099,6 +1102,47 @@ function toggleMic(){
   $('mic-dot').className = 'pill-dot ' + (S.micMuted ? 'red' : 'green');
   $('mic-label').textContent = micText;
   syncOverlayControls();
+}
+
+function setPhoneMicMuted(muted) {
+  if (!S.localStream) return;
+  S.micMuted = !!muted;
+  S.localStream.getAudioTracks().forEach(t => t.enabled = !S.micMuted);
+  if (micGainNode) micGainNode.gain.value = S.micMuted ? 0 : parseFloat($('mic-gain-slider')?.value || 1);
+  const micText = S.micMuted ? 'Mic off' : 'Mic';
+  const micIcon = S.micMuted ? '🔇 Mic off' : '🎤 Mic on';
+  $('mute-btn').textContent = micIcon;
+  $('mute-btn').classList.toggle('active-mute', S.micMuted);
+  $('mic-dot').className = 'pill-dot ' + (S.micMuted ? 'red' : 'green');
+  $('mic-label').textContent = micText;
+  syncOverlayControls();
+}
+
+function setPhoneSpeakerMuted(muted) {
+  studioAudioMuted = !!muted;
+  const audio = document.getElementById('studio-audio-return');
+  if (audio) audio.muted = studioAudioMuted;
+  const vid = $('studio-return-video');
+  if (vid) {
+    vid.muted = true;
+    vid.volume = 0;
+  }
+  const btn = $('studio-mic-btn');
+  if (btn) {
+    btn.textContent = studioAudioMuted ? 'Mic 🔇' : 'Mic';
+    btn.classList.toggle('off', studioAudioMuted);
+  }
+}
+
+function applyHostAudioMode(msg) {
+  if (typeof msg.phoneMicMuted === 'boolean') setPhoneMicMuted(msg.phoneMicMuted);
+  if (typeof msg.phoneSpeakerMuted === 'boolean') setPhoneSpeakerMuted(msg.phoneSpeakerMuted);
+  const label = msg.mode === 'studio-to-phone'
+    ? 'Mode: Studio audio to phone. Your mic is off.'
+    : msg.mode === 'phone-to-studio'
+      ? 'Mode: Phone mic to studio. Return speaker muted.'
+      : 'Audio mode updated';
+  chatLog('', label, true);
 }
 
 function toggleCam(){
