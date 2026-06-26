@@ -499,6 +499,13 @@ input:focus,select:focus{border-color:var(--amber)}
                 <span id="studio-vol-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right">45%</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:24px;flex-shrink:0">SPK</span>
+                <select id="phone-speaker-select" onchange="setPhoneSpeakerSource(this.value)"
+                  style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.58rem;padding:4px 6px">
+                  <option value="">Browser default speaker</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
                 <span style="font-family:var(--fm);font-size:.55rem;color:var(--subtle);width:24px;flex-shrink:0">LVL</span>
                 <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden">
                   <div id="studio-level-meter" style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--teal) 0%,var(--amber) 70%,var(--red) 92%);transition:width .05s linear"></div>
@@ -704,6 +711,7 @@ $('allow-btn').addEventListener('click', async () => {
     setupVU();
     setupMicGain();
     show('screen-live');
+    loadSpeakerOutputs();
     connectWS();
     unlockAudioContext();
     loadCameras().then(() => {
@@ -854,8 +862,9 @@ function createPeerConnection(targetPeerId, initiate){
       }
       const audioStream = stream.getAudioTracks().length ? stream : new MediaStream([track]);
       audioEl.srcObject = audioStream;
-      audioEl.muted = false;
+      audioEl.muted = studioAudioMuted;
       audioEl.volume = parseFloat($('studio-vol-slider')?.value || 0.45);
+      applyPhoneSpeakerTo(audioEl);
 
       audioEl.play().then(() => {
         chatLog('', '🔊 Studio audio playing', true);
@@ -1712,6 +1721,46 @@ let studioAudioMuted = false;
 let studioVideoOff   = false;
 let studioLevelCtx   = null;
 let studioLevelFrame = null;
+let selectedPhoneSpeakerId = '';
+
+async function loadSpeakerOutputs() {
+  const sel = $('phone-speaker-select');
+  if (!sel) return;
+  if (!('setSinkId' in HTMLMediaElement.prototype)) {
+    sel.innerHTML = '<option value="">Browser default speaker</option>';
+    sel.disabled = true;
+    sel.title = 'This browser does not allow speaker output selection.';
+    return;
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devices.filter(d => d.kind === 'audiooutput');
+    const current = selectedPhoneSpeakerId || sel.value || '';
+    sel.innerHTML = '<option value="">Browser default speaker</option>' + outputs.map((d, i) =>
+      `<option value="${d.deviceId}">${d.label || 'Speaker ' + (i + 1)}</option>`
+    ).join('');
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+    sel.disabled = false;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Browser default speaker</option>';
+    sel.disabled = true;
+  }
+}
+
+async function setPhoneSpeakerSource(deviceId) {
+  selectedPhoneSpeakerId = deviceId || '';
+  await applyPhoneSpeakerTo(document.getElementById('studio-audio-return'));
+  chatLog('', 'Phone speaker: ' + ($('phone-speaker-select')?.selectedOptions?.[0]?.textContent || 'Browser default'), true);
+}
+
+async function applyPhoneSpeakerTo(audioEl) {
+  if (!audioEl || !('setSinkId' in audioEl)) return;
+  try {
+    await audioEl.setSinkId(selectedPhoneSpeakerId || '');
+  } catch(e) {
+    chatLog('', 'Speaker select failed: ' + e.message, true);
+  }
+}
 
 function forcePlayStudioAudio(btn) {
   // Diagnose exactly what state the audio element is in
@@ -1740,6 +1789,7 @@ function forcePlayStudioAudio(btn) {
   newAudio.srcObject = stream;
   newAudio.volume = parseFloat($('studio-vol-slider')?.value || 0.45);
   document.body.appendChild(newAudio);
+  applyPhoneSpeakerTo(newAudio);
 
   newAudio.play()
     .then(() => {

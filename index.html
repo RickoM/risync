@@ -778,6 +778,14 @@ label.field-label{
             </select>
             <button class="src-ctrl-btn" onclick="REC.playReturnTestTone()" style="margin-left:4px">Tone</button>
           </div>
+          <!-- SPK row: studio speaker output for phone audio monitor -->
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">SPK</span>
+            <select id="studio-speaker-select-inline" onchange="REC.setStudioSpeakerSource(this.value)"
+              style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
+              <option value="">Browser default speaker</option>
+            </select>
+          </div>
           <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
             <span class="src-ctrl-label">GAIN</span>
@@ -1587,6 +1595,7 @@ const REC = {
     const devices = await navigator.mediaDevices.enumerateDevices();
     this.renderAudioDevices(devices.filter(d => d.kind === 'audioinput'));
     this.populateInlineAudioSelect(devices.filter(d => d.kind === 'audioinput'));
+    this.populateSpeakerSelect(devices.filter(d => d.kind === 'audiooutput'));
     this.renderVideoDevices(devices.filter(d => d.kind === 'videoinput'));
   },
 
@@ -1661,6 +1670,43 @@ const REC = {
       return `<option value="${d.deviceId}">${label}</option>`;
     }).join('');
     if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  },
+
+  populateSpeakerSelect(devices) {
+    const sel = $('studio-speaker-select-inline');
+    if (!sel) return;
+    if (!('setSinkId' in HTMLMediaElement.prototype)) {
+      sel.innerHTML = '<option value="">Browser default speaker</option>';
+      sel.disabled = true;
+      sel.title = 'This browser does not allow speaker output selection.';
+      return;
+    }
+    const current = this.selectedSpeakerDeviceId || sel.value || '';
+    const options = devices.length
+      ? devices.map((d, i) => `<option value="${d.deviceId}">${d.label || 'Speaker ' + (i + 1)}</option>`).join('')
+      : '';
+    sel.innerHTML = '<option value="">Browser default speaker</option>' + options;
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+    sel.disabled = false;
+  },
+
+  async setStudioSpeakerSource(deviceId) {
+    this.selectedSpeakerDeviceId = deviceId || '';
+    const targets = [...document.querySelectorAll('audio[id^="phone-audio-"]')];
+    await Promise.all(targets.map(a => this.applyStudioSpeakerTo(a)));
+    const sel = $('studio-speaker-select-inline');
+    const label = sel?.selectedOptions?.[0]?.textContent || 'Browser default speaker';
+    toast('Studio speaker: ' + label);
+  },
+
+  async applyStudioSpeakerTo(audioEl) {
+    if (!audioEl || !('setSinkId' in audioEl)) return;
+    try {
+      await audioEl.setSinkId(this.selectedSpeakerDeviceId || '');
+    } catch(e) {
+      console.warn('[AudioOutput] Studio speaker select failed:', e.message);
+      toast('Speaker select failed: ' + e.message);
+    }
   },
 
   async selectStudioAudioSource(deviceId) {
@@ -2005,6 +2051,16 @@ const REC = {
   playReturnTestTone() {
     const returnStream = this.ensureReturnAudio();
     this.updateReturnAudioSenders();
+    let openPeers = 0;
+    this.talkbackSenders?.forEach((senders, peerId) => {
+      if (!senders?.audio) return;
+      senders.returnEnabled = true;
+      if (senders.audio.track) senders.audio.track.enabled = true;
+      this.setTalkbackButtonState(peerId, true);
+      this.setRemoteMonitorState(peerId, false);
+      this.sigSend({ type:'host-audio-mode', targetPeerId:peerId, phoneMicMuted:true, phoneSpeakerMuted:false, mode:'studio-to-phone' });
+      openPeers++;
+    });
     try {
       const osc = this.returnAudioCtx.createOscillator();
       const gain = this.returnAudioCtx.createGain();
@@ -2016,8 +2072,8 @@ const REC = {
       gain.connect(this.returnAudioDest);
       osc.start();
       osc.stop(this.returnAudioCtx.currentTime + 1.05);
-      toast('Sent test tone to phone return');
-      console.log('[ReturnAudio] Test tone sent, tracks:', returnStream.getAudioTracks().length);
+      toast(openPeers ? 'Sent test tone to phone return' : 'No phone connected for tone');
+      console.log('[ReturnAudio] Test tone sent, peers:', openPeers, 'tracks:', returnStream.getAudioTracks().length);
     } catch(e) {
       toast('Tone failed: ' + e.message);
     }
@@ -2764,6 +2820,7 @@ const REC = {
     audio.srcObject = audioTracks.length === stream.getTracks().length ? stream : new MediaStream(audioTracks);
     audio.muted = false;
     audio.volume = 0.8;
+    this.applyStudioSpeakerTo(audio);
 
     audio.play().then(() => {
       toast('Remote audio active');
@@ -3386,6 +3443,10 @@ const REC = {
     if (this.webcamGainNode) this.webcamGainNode.gain.value = next ? 0 : parseFloat($('webcam-gain-slider')?.value || 1);
     btn.textContent = next ? 'Off' : 'On';
     btn.classList.toggle('off', next);
+    this.phonePeers?.forEach((pc, peerId) => {
+      if (pc.connectionState === 'closed') return;
+      this.setDirectionalAudioMode(peerId, next ? 'phone-to-studio' : 'studio-to-phone');
+    });
   },
 
   setWebcamGain(val) {
@@ -3521,6 +3582,7 @@ const REC = {
     if (audio) audio.muted = next;
     btn.textContent = next ? 'Off' : 'On';
     btn.classList.toggle('off', next);
+    this.setDirectionalAudioMode(peerId, next ? 'studio-to-phone' : 'phone-to-studio');
   },
 
   // Start audio level animation for a phone peer
