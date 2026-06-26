@@ -752,7 +752,7 @@ label.field-label{
           </div>
         </div>
         <div class="src-controller">
-          <!-- CAM row: on/off + video level indicator -->
+          <!-- CAM section -->
           <div class="src-ctrl-row">
             <span class="src-ctrl-label">CAM</span>
             <button class="src-ctrl-btn" id="webcam-cam-btn" onclick="REC.toggleWebcam(this)">On</button>
@@ -760,34 +760,41 @@ label.field-label{
               <div id="webcam-level" style="height:100%;width:60%;background:var(--teal);transition:width .1s"></div>
             </div>
           </div>
-          <!-- MIC row: on/off + level meter + dB -->
           <div class="src-ctrl-row">
+            <span class="src-ctrl-label">SRC</span>
+            <select id="webcam-select-inline" onchange="REC.startWebcam(this.value)"
+              style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
+              <option value="">Default camera</option>
+            </select>
+          </div>
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">NAME</span>
+            <input id="webcam-name-input" value="Webcam"
+              style="flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--body);font-family:var(--fm);font-size:.65rem;outline:none;padding:2px 4px"
+              onchange="REC.renameWebcam(this.value)">
+          </div>
+          <div class="src-ctrl-row">
+            <span class="src-ctrl-label">MIRROR</span>
+            <button class="src-ctrl-btn" id="webcam-mirror-btn" onclick="REC.toggleWebcamMirror(this)">Off</button>
+            <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);flex:1;margin-left:8px">Flip image</span>
+          </div>
+          <!-- MIC section -->
+          <div class="src-ctrl-row" style="border-top:1px solid var(--border);padding-top:7px;margin-top:5px">
             <span class="src-ctrl-label">MIC</span>
             <button class="src-ctrl-btn" id="webcam-mic-btn" onclick="REC.toggleWebcamMic(this)">On</button>
             <div style="flex:1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 8px">
               <div id="webcam-mic-level" style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--amber));transition:width .05s"></div>
             </div>
-            <span id="webcam-mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:34px;text-align:right;flex-shrink:0">—dB</span>
+            <span id="webcam-mic-db" style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);width:34px;text-align:right;flex-shrink:0">--dB</span>
           </div>
-          <!-- MIC SRC row: studio mic/audio source + local mic monitor test -->
           <div class="src-ctrl-row">
-            <span class="src-ctrl-label">MIC SRC</span>
+            <span class="src-ctrl-label">SRC</span>
             <select id="webcam-audio-select-inline" onchange="REC.selectStudioAudioSource(this.value)"
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
               <option value="">System default mic</option>
             </select>
             <button class="src-ctrl-btn" onclick="REC.testStudioMicToSpeaker(this)" style="margin-left:4px">Mic Test</button>
           </div>
-          <!-- SPK SRC row: studio speaker output + local speaker tone test -->
-          <div class="src-ctrl-row">
-            <span class="src-ctrl-label">SPK SRC</span>
-            <select id="studio-speaker-select-inline" onchange="REC.setStudioSpeakerSource(this.value)"
-              style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
-              <option value="">System default speaker</option>
-            </select>
-            <button class="src-ctrl-btn" onclick="REC.testStudioSpeakerTone(this)" style="margin-left:4px">Spk Test</button>
-          </div>
-          <!-- GAIN row: mic gain slider + auto -->
           <div class="src-ctrl-row">
             <span class="src-ctrl-label">GAIN</span>
             <input type="range" id="webcam-gain-slider" min="0" max="4" step="0.05" value="1"
@@ -796,34 +803,26 @@ label.field-label{
             <span id="webcam-gain-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:34px;text-align:right;flex-shrink:0">0 dB</span>
             <button class="src-ctrl-btn" onclick="REC.autoGainWebcam()" style="margin-left:4px">Auto</button>
           </div>
-          <!-- VOL row: monitor volume for webcam preview -->
-          <div class="src-ctrl-row">
-            <span class="src-ctrl-label">VOL</span>
-            <input type="range" min="0" max="1" step="0.05" value="0"
-              style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
-              oninput="const v=$('webcam-video'); if(v) v.volume=this.value; this.nextElementSibling.textContent=Math.round(this.value*100)+'%'">
-            <span style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right;flex-shrink:0">0%</span>
+          <!-- SPK section -->
+          <div class="src-ctrl-row" style="border-top:1px solid var(--border);padding-top:7px;margin-top:5px">
+            <span class="src-ctrl-label">SPK</span>
+            <button class="src-ctrl-btn" id="studio-spk-btn" onclick="REC.toggleStudioSpeakerOutput(this)">On</button>
+            <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);flex:1;margin-left:8px">Studio monitor output</span>
           </div>
-          <!-- MIRROR row: horizontal flip for selfie-style webcam -->
-          <div class="src-ctrl-row">
-            <span class="src-ctrl-label">MIRROR</span>
-            <button class="src-ctrl-btn" id="webcam-mirror-btn" onclick="REC.toggleWebcamMirror(this)">Off</button>
-            <span style="font-family:var(--fm);font-size:.58rem;color:var(--subtle);flex:1;margin-left:8px">Flip image horizontally</span>
-          </div>
-          <!-- SRC row: camera source selector -->
           <div class="src-ctrl-row">
             <span class="src-ctrl-label">SRC</span>
-            <select id="webcam-select-inline" onchange="REC.startWebcam(this.value)"
+            <select id="studio-speaker-select-inline" onchange="REC.setStudioSpeakerSource(this.value)"
               style="flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--bright);font-family:var(--fm);font-size:.6rem;padding:4px 6px">
-              <option value="">Default camera</option>
+              <option value="">System default speaker</option>
             </select>
+            <button class="src-ctrl-btn" onclick="REC.testStudioSpeakerTone(this)" style="margin-left:4px">Spk Test</button>
           </div>
-          <!-- NAME row: editable label -->
           <div class="src-ctrl-row">
-            <span class="src-ctrl-label">NAME</span>
-            <input id="webcam-name-input" value="Webcam"
-              style="flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--body);font-family:var(--fm);font-size:.65rem;outline:none;padding:2px 4px"
-              onchange="REC.renameWebcam(this.value)">
+            <span class="src-ctrl-label">VOL</span>
+            <input type="range" id="studio-speaker-vol-slider" min="0" max="1" step="0.05" value="0.8"
+              style="flex:1;height:3px;accent-color:var(--amber);margin:0 8px"
+              oninput="REC.setStudioSpeakerVolume(this.value)">
+            <span id="studio-speaker-vol-val" style="font-family:var(--fm);font-size:.58rem;color:var(--amber);width:30px;text-align:right;flex-shrink:0">80%</span>
           </div>
         </div>
       </div>
@@ -1547,6 +1546,9 @@ const REC = {
   takes: [],
   takeCount: 0,
   selectedDeviceId: null,
+  selectedSpeakerDeviceId: '',
+  studioSpeakerMuted: false,
+  studioSpeakerVolume: 0.8,
   gainNode: null,
   analyserL: null,
   analyserR: null,
@@ -1712,6 +1714,29 @@ const REC = {
     toast('Studio speaker: ' + label);
   },
 
+  toggleStudioSpeakerOutput(btn) {
+    this.studioSpeakerMuted = !this.studioSpeakerMuted;
+    document.querySelectorAll('audio[id^="phone-audio-"]').forEach(a => {
+      a.muted = this.studioSpeakerMuted;
+      a.volume = this.studioSpeakerVolume;
+    });
+    if (this._studioLocalTestAudio) this._studioLocalTestAudio.muted = this.studioSpeakerMuted;
+    btn.dataset.off = this.studioSpeakerMuted ? 'true' : 'false';
+    btn.textContent = this.studioSpeakerMuted ? 'Off' : 'On';
+    btn.classList.toggle('off', this.studioSpeakerMuted);
+    toast(this.studioSpeakerMuted ? 'Studio speaker monitor off' : 'Studio speaker monitor on');
+  },
+
+  setStudioSpeakerVolume(val) {
+    this.studioSpeakerVolume = parseFloat(val);
+    document.querySelectorAll('audio[id^="phone-audio-"]').forEach(a => {
+      a.volume = this.studioSpeakerVolume;
+    });
+    if (this._studioLocalTestAudio) this._studioLocalTestAudio.volume = this.studioSpeakerVolume;
+    const out = $('studio-speaker-vol-val');
+    if (out) out.textContent = Math.round(this.studioSpeakerVolume * 100) + '%';
+  },
+
   async applyStudioSpeakerTo(audioEl) {
     if (!audioEl || !('setSinkId' in audioEl)) return;
     try {
@@ -1737,15 +1762,15 @@ const REC = {
     const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.playsInline = true;
-    audio.muted = false;
-    audio.volume = 1;
+    audio.muted = this.studioSpeakerMuted;
+    audio.volume = this.studioSpeakerVolume;
     audio.srcObject = dest.stream;
     document.body.appendChild(audio);
     await this.applyStudioSpeakerTo(audio);
 
     const oldText = btn?.textContent || 'SPK Tone';
     if (btn) btn.textContent = 'Playing';
-    audio.play().then(() => toast('Studio speaker tone playing')).catch(e => toast('Speaker tone blocked: ' + e.message));
+    audio.play().then(() => toast(this.studioSpeakerMuted ? 'Speaker is off' : 'Studio speaker tone playing')).catch(e => toast('Speaker tone blocked: ' + e.message));
     osc.start();
     osc.stop(ctx.currentTime + 1.45);
     window.setTimeout(() => {
@@ -1772,8 +1797,8 @@ const REC = {
     const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.playsInline = true;
-    audio.muted = false;
-    audio.volume = 0.55;
+    audio.muted = this.studioSpeakerMuted;
+    audio.volume = this.studioSpeakerVolume;
     audio.srcObject = this.audioStream;
     document.body.appendChild(audio);
     this._studioLocalTestAudio = audio;
@@ -2900,13 +2925,13 @@ const REC = {
       audio.id = `phone-audio-${peerId}`;
       audio.autoplay = true;
       audio.playsInline = true;
-      audio.muted = false;
-      audio.volume = 0.8;
+      audio.muted = this.studioSpeakerMuted;
+      audio.volume = this.studioSpeakerVolume;
       document.body.appendChild(audio);
     }
     audio.srcObject = audioTracks.length === stream.getTracks().length ? stream : new MediaStream(audioTracks);
-    audio.muted = false;
-    audio.volume = 0.8;
+    audio.muted = this.studioSpeakerMuted;
+    audio.volume = this.studioSpeakerVolume;
     this.applyStudioSpeakerTo(audio);
 
     audio.play().then(() => {
